@@ -33,8 +33,8 @@ fi
 log "🚀 Iniciando instalação em sistema Debian-like ($LOCAL_IP)..."
 
 # 2. Instalação de Dependências Iniciais
-log "📦 Instalando dependências de rede e sistema..."
-apt update -qq
+log "📦 Instalando dependências de rede e sistema, aguarde..."
+apt update -y
 apt install -y apache2 apache2-utils sqlite3 php php-mysql php-sqlite3 php-curl git curl mysql-client sshpass >/dev/null
 
 # 3. Automação SSH no MK-Auth
@@ -139,15 +139,16 @@ fi
 log "📝 Atualizando config.php..."
 CONFIG_FILE="$INSTALL_DIR/config.php"
 sed -i "s/\$servername    = .*/\$servername    = \"$MK_IP\";/" "$CONFIG_FILE"
-sed -i "s/\$username 	   = .*/\$username 	   = \"$MK_USER\";/" "$CONFIG_FILE"
-sed -i "s/\$password 	   = .*/\$password 	   = \"$MK_PASS\";/" "$CONFIG_FILE"
-sed -i "s/\$token 	   = .*/\$token 	   = \"$API_TOKEN\";/" "$CONFIG_FILE"
-sed -i "s/\$wsip 	   = .*/\$wsip 	   = \"http:\/\/127.0.0.1:8000\";/" "$CONFIG_FILE"
+sed -i "s/\$username      = .*/\$username 	   = \"$MK_USER\";/" "$CONFIG_FILE"
+sed -i "s/\$password      = .*/\$password 	   = \"$MK_PASS\";/" "$CONFIG_FILE"
+sed -i "s/\$provedor      = .*/\$provedor	   = \"$PROVEDOR_NOME\";/" "$CONFIG_FILE"
+sed -i "s/\$site          = .*/\$site		   = \"$PROVEDOR_SITE\";/" "$CONFIG_FILE"
+sed -i "s/\$wsip          = .*/\$wsip 	   = \"http:\/\/127.0.0.1:8000\";/" "$CONFIG_FILE"
+sed -i "s/\$token         = .*/\$token 	   = \"$API_TOKEN\";/" "$CONFIG_FILE"
 sed -i "s/\$diasnoprazo    = .*/\$diasnoprazo    = $DIAS_NOPRAZO;/" "$CONFIG_FILE"
 sed -i "s/\$diasvencido    = .*/\$diasvencido    = $DIAS_VENCIDO;/" "$CONFIG_FILE"
 sed -i "s/\$diaspago       = .*/\$diaspago       = $DIAS_PAGO;/" "$CONFIG_FILE"
-sed -i "s/\$provedor	   = .*/\$provedor	   = \"$PROVEDOR_NOME\";/" "$CONFIG_FILE"
-sed -i "s/\$site		   = .*/\$site		   = \"$PROVEDOR_SITE\";/" "$CONFIG_FILE"
+
 
 # 9. Permissões e Apache
 log "🔐 Configurando permissões e Apache..."

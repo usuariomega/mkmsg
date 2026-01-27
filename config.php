@@ -4,25 +4,25 @@
 $servername    = "127.0.0.1";
 
 //Usuário do banco de dados do do MK-Auth
-$username 	   = "nomedousuario";
+$username      = "nomedousuario";
 
 //Senha do banco de dados do do MK-Auth
-$password 	   = "suasenha";
+$password      = "suasenha";
 
 //Nome do banco de dados do do MK-Auth
-$dbname		   = "mkradius";
+$dbname        = "mkradius";
 
 //Nome do seu provedor
-$provedor	   = "XYZ";
+$provedor      = "XYZ";
 
 //Site do seu provedor (OBS: não coloque https://)
-$site		   = "www.xyz.com.br";
+$site          = "www.xyz.com.br";
 
-//IP do MkAuth WhatsApp Send Message
-$wsip		   = "127.0.0.1";
+//IP da API do WhatsApp
+$wsip          = "127.0.0.1";
 
-//Token do MkAuth WhatsApp Send Message
-$token		   = "MEU_TOKEN";
+//Token da API do WhatsApp
+$token         = "MEU_TOKEN";
 
 //Ajusta fuso horário do PHP
 date_default_timezone_set('America/Sao_Paulo');
