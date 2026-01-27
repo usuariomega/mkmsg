@@ -30,14 +30,14 @@ rm -rf "$APP_DIR"
 
 # 2. Sistema
 log "🚀 Instalando dependências do sistema..."
-sudo apt update -qq
-sudo apt install -y -qq curl git ca-certificates build-essential >/dev/null
+sudo apt-get update -qq
+sudo apt-get install -y -qq curl git ca-certificates build-essential >/dev/null
 
 # 3. Node.js & PM2
 if ! command -v node >/dev/null; then
     log "🌐 Instalando Node.js $NODE_VERSION..."
     curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo -E bash - >/dev/null
-    sudo apt install -y -qq nodejs >/dev/null
+    sudo apt-get install -y -qq nodejs >/dev/null
 fi
 
 if ! command -v pm2 >/dev/null; then
@@ -291,7 +291,7 @@ EOF
 
 # 12. Finalização
 log "🚀 Iniciando com PM2..."
-pm2 start index.js --name "$APP_NAME"
+pm2 start index.js --name "$APP_NAME" --silent
 pm2 save --silent
 sudo pm2 startup systemd -u "$USER_NAME" --hp "$HOME_DIR" --silent
 

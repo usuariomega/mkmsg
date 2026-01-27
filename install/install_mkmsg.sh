@@ -35,8 +35,8 @@ log "🚀 Iniciando instalação em sistema Debian-like ($LOCAL_IP)..."
 # 2. Instalação de Dependências Iniciais
 log "📦 Instalando dependências de rede e sistema, aguarde..."
 echo "Apt::Cmd::Disable-Script-Warning true;" > /etc/apt/apt.conf.d/90disablescriptwarning
-apt update -qq
-apt install -y -qq apache2 apache2-utils sqlite3 php php-mysql php-sqlite3 php-curl git curl mysql-client sshpass >/dev/null
+apt-get update -qq
+apt-get install -y -qq apache2 apache2-utils sqlite3 php php-mysql php-sqlite3 php-curl git curl mysql-client sshpass >/dev/null
 
 # 3. Automação SSH no MK-Auth
 echo -e "\n--- Configuração do Servidor MK-Auth (Configurar acesso ao banco de dados) ---"
@@ -50,8 +50,16 @@ ATTEMPT=1
 SSH_SUCCESS=false
 
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-    read -s -p "Senha SSH do $MK_SSH_USER no MK-Auth (Tentativa $ATTEMPT/$MAX_ATTEMPTS): " MK_SSH_PASS
-    echo ""
+    # Validação de senha não vazia
+    while true; do
+        read -s -p "Senha SSH do $MK_SSH_USER no MK-Auth (Tentativa $ATTEMPT/$MAX_ATTEMPTS): " MK_SSH_PASS
+        echo ""
+        if [ -z "$MK_SSH_PASS" ]; then
+            warn "A senha não pode estar em branco. Por favor, digite a senha."
+        else
+            break
+        fi
+    done
     
     log "📡 Testando conexão SSH..."
     if sshpass -p "$MK_SSH_PASS" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 "$MK_SSH_USER@$MK_IP" "exit" 2>/dev/null; then
@@ -69,8 +77,20 @@ if [ "$SSH_SUCCESS" = false ]; then
 fi
 
 # Dados do Banco
-read -p "Usuário que deseja criar no Banco (ex: mkmsg_user): " MK_USER
-read -p "Senha para este novo usuário: " MK_PASS
+read -p "Usuário que deseja criar para ler o banco de dados do Mk-Auth (ex: mkmsglerdb): " MK_USER
+MK_USER=${MK_USER:-mkmsglerdb}
+
+# Validação de senha do novo usuário do banco (não pode ser vazia)
+while true; do
+    read -p "Senha para este novo usuário ($MK_USER): " MK_PASS
+    if [ -z "$MK_PASS" ]; then
+        warn "A senha não pode estar em branco."
+    else
+        break
+    fi
+done
+
+# Senha ROOT do MySQL (com valor padrão vertrigo se estiver em branco)
 read -p "Senha ROOT do MySQL do MK-Auth (padrão: vertrigo): " MK_ROOT_PASS
 MK_ROOT_PASS=${MK_ROOT_PASS:-vertrigo}
 
@@ -78,7 +98,7 @@ log "⚙️ Configurando MySQL remotamente no MK-Auth..."
 REMOTE_SCRIPT="
 sed -i 's/bind-address.*/bind-address = $MK_IP/' /etc/mysql/conf.d/50-server.cnf
 service mysql restart
-mysql -u root -p$MK_ROOT_PASS -e \"CREATE USER IF NOT EXISTS '$MK_USER'@'$LOCAL_IP' IDENTIFIED BY '$MK_PASS'; GRANT SELECT ON mkradius.* TO '$MK_USER'@'$LOCAL_IP'; FLUSH PRIVILEGES;\"
+mysql -u root -p$MK_ROOT_PASS -e \"DROP USER IF EXISTS '$MK_USER'@'$LOCAL_IP'; CREATE USER '$MK_USER'@'$LOCAL_IP' IDENTIFIED BY '$MK_PASS'; GRANT SELECT ON mkradius.* TO '$MK_USER'@'$LOCAL_IP'; FLUSH PRIVILEGES;\"
 "
 
 sshpass -p "$MK_SSH_PASS" ssh -o StrictHostKeyChecking=no "$MK_SSH_USER@$MK_IP" "$REMOTE_SCRIPT"
@@ -88,7 +108,7 @@ echo -e "\n--- Personalização do Provedor ---"
 read -p "Nome do seu Provedor: " PROVEDOR_NOME
 read -p "Site do seu Provedor (ex: www.provedor.com.br): " PROVEDOR_SITE
 
-# Tratamento da URL do Provedor (remove http:// ou https://)
+# Tratamento da URL do Provedor (remove http:// ou https:// e garante www.)
 PROVEDOR_SITE=$(echo "$PROVEDOR_SITE" | sed -e 's|^[^/]*//||' -e 's|^www\.||')
 PROVEDOR_SITE="www.$PROVEDOR_SITE"
 
@@ -111,10 +131,36 @@ DIAS_VENCIDO=1
 DIAS_PAGO=1
 
 # 7. Acesso e Cron Opcional
-echo -e "\n--- Configuração de Acesso ao Painel ---"
-read -p "Usuário para o Painel Web (padrão: admin): " WEB_USER
+echo -e "\n--- Configuração de segurança para Acesso ao Painel do MK-MSG ---"
+read -p "Usuário para poder acessar o Painel do MK-MSG (padrão: admin): " WEB_USER
 WEB_USER=${WEB_USER:-admin}
-htpasswd -c /etc/apache2/.htpasswd "$WEB_USER"
+
+# Loop para garantir que o htpasswd seja criado com sucesso e sem senha vazia
+while true; do
+    log "Defina a senha de acesso ao painel do MK-MSG:"
+    # Usamos o modo não interativo do htpasswd para ter controle total sobre a validação
+    read -s -p "Digite a senha: " PASS1
+    echo ""
+    if [ -z "$PASS1" ]; then
+        warn "A senha não pode estar em branco. Tente novamente."
+        continue
+    fi
+    read -s -p "Confirme a senha: " PASS2
+    echo ""
+    
+    if [ "$PASS1" != "$PASS2" ]; then
+        warn "As senhas não coincidem. Tente novamente."
+    else
+        # Cria o arquivo de senhas usando o modo batch (-b) para evitar o prompt do htpasswd
+        if htpasswd -bc /etc/apache2/.htpasswd "$WEB_USER" "$PASS1"; then
+            log "✅ Usuário do painel criado com sucesso!"
+            WEB_PASS="$PASS1" # Guarda para usar no Cron se necessário
+            break
+        else
+            error "Erro ao criar o arquivo de senhas do Apache."
+        fi
+    fi
+done
 
 read -p "Deseja configurar o agendamento automático (Cron)? [S/n]: " CONFIRM_CRON
 if [[ "$CONFIRM_CRON" =~ ^[Ss]$ ]] || [ -z "$CONFIRM_CRON" ]; then
@@ -126,7 +172,9 @@ if [[ "$CONFIRM_CRON" =~ ^[Ss]$ ]] || [ -z "$CONFIRM_CRON" ]; then
     read -p "Dias após pago (pago) [padrão: 1]: " DIAS_PAGO
     DIAS_PAGO=${DIAS_PAGO:-1}
 
-    read -p "Confirme a senha do Painel Web para o Cron: " WEB_PASS
+    # A senha do Cron agora usa a mesma validada acima, mas confirmamos se o usuário quer manter
+    log "Usando a senha do painel web para o agendamento automático."
+
     (crontab -l 2>/dev/null | grep -v "mkmsg/cron") | crontab -
     (crontab -l 2>/dev/null; echo "0 9  * * * curl -X POST -F 'posttodos=1' http://$WEB_USER:$WEB_PASS@127.0.0.1/mkmsg/cronnoprazo.php > /dev/null 2>&1") | crontab -
     (crontab -l 2>/dev/null; echo "0 10 * * * curl -X POST -F 'posttodos=1' http://$WEB_USER:$WEB_PASS@127.0.0.1/mkmsg/cronvencido.php > /dev/null 2>&1") | crontab -
@@ -140,12 +188,11 @@ fi
 log "📝 Atualizando config.php..."
 CONFIG_FILE="$INSTALL_DIR/config.php"
 sed -i "s/\$servername    = .*/\$servername    = \"$MK_IP\";/" "$CONFIG_FILE"
-sed -i "s/\$username      = .*/\$username 	   = \"$MK_USER\";/" "$CONFIG_FILE"
-sed -i "s/\$password      = .*/\$password 	   = \"$MK_PASS\";/" "$CONFIG_FILE"
-sed -i "s/\$provedor      = .*/\$provedor	   = \"$PROVEDOR_NOME\";/" "$CONFIG_FILE"
-sed -i "s/\$site          = .*/\$site		   = \"$PROVEDOR_SITE\";/" "$CONFIG_FILE"
-sed -i "s/\$wsip          = .*/\$wsip 	   = \"http:\/\/127.0.0.1:8000\";/" "$CONFIG_FILE"
-sed -i "s/\$token         = .*/\$token 	   = \"$API_TOKEN\";/" "$CONFIG_FILE"
+sed -i "s/\$username      = .*/\$username      = \"$MK_USER\";/" "$CONFIG_FILE"
+sed -i "s/\$password      = .*/\$password      = \"$MK_PASS\";/" "$CONFIG_FILE"
+sed -i "s/\$provedor      = .*/\$provedor      = \"$PROVEDOR_NOME\";/" "$CONFIG_FILE"
+sed -i "s/\$site          = .*/\$site          = \"$PROVEDOR_SITE\";/" "$CONFIG_FILE"
+sed -i "s/\$token         = .*/\$token         = \"$API_TOKEN\";/" "$CONFIG_FILE"
 sed -i "s/\$diasnoprazo    = .*/\$diasnoprazo    = $DIAS_NOPRAZO;/" "$CONFIG_FILE"
 sed -i "s/\$diasvencido    = .*/\$diasvencido    = $DIAS_VENCIDO;/" "$CONFIG_FILE"
 sed -i "s/\$diaspago       = .*/\$diaspago       = $DIAS_PAGO;/" "$CONFIG_FILE"
@@ -171,10 +218,14 @@ fi
 log "✅ INSTALAÇÃO CONCLUÍDA!"
 log "-------------------------------------------------------"
 log "PROVEDOR:       $PROVEDOR_NOME ($PROVEDOR_SITE)"
+log ""
 log "SISTEMA MK-MSG: http://$LOCAL_IP/mkmsg"
+log "Usuário:        $WEB_USER"
+log "Senha:          $WEB_PASS"
+log ""
 log "API WHATSAPP:   http://$LOCAL_IP:8000"
 log "TOKEN DA API:   $API_TOKEN"
 log "-------------------------------------------------------"
-log "💡 DICA: Se precisar reconfigurar qualquer variável (IP, Token, etc),"
-log "basta editar o arquivo: $CONFIG_FILE"
+log "💡 DICA: Se precisar reconfigurar qualquer variável "
+log "(IP, Token, etc), basta editar o arquivo: $CONFIG_FILE"
 log "-------------------------------------------------------"
