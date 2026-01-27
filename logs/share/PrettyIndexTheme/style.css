@@ -1,7 +1,7 @@
 @import url("//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css");
 @import url('//fonts.googleapis.com/css?family=Open+Sans');
 @import url('//maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css');
-/* Have to use @import for the font, as you can only specify a single stylesheet */
+
 body {
   font-family: "Open Sans", "Segoe UI", Frutiger, "Frutiger Linotype", "Dejavu Sans", "Helvetica Neue", Arial, sans-serif;
   font-size: 14px;

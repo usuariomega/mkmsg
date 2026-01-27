@@ -5,8 +5,8 @@
     <title>MK-MSG</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.datatables.net/v/dt/jq-3.7.0/dt-2.0.8/r-3.0.2/datatables.min.css" rel="stylesheet">
-    <script src="https://cdn.datatables.net/v/dt/jq-3.7.0/dt-2.0.8/r-3.0.2/datatables.min.js"></script>
+    <link href="https://cdn.datatables.net/v/dt/jq-3.7.0/dt-2.3.6/r-3.0.7/datatables.min.css" rel="stylesheet" integrity="sha384-UfSavg27SLgQJ24zeLvDxB3G1thAA8eUAs6c/q0I2cpoKUcE/l2UMPLCTNBJz00s" crossorigin="anonymous">
+    <script src="https://cdn.datatables.net/v/dt/jq-3.7.0/dt-2.3.6/r-3.0.7/datatables.min.js" integrity="sha384-ypQzQNCsxzmYsxOYlbt0ag1ahjGS2Wq8XK1ZYD5xCUV81S+ztC7JHRiTkAS0+WdY" crossorigin="anonymous"></script>
     <script>
     $(document).ready(function() {
         $('#table_id').DataTable({
@@ -206,6 +206,12 @@
 
     div.dt-container .dt-paging .dt-paging-button {
         padding: 1.5em 2.0em;
+    }
+
+    @media screen and (max-width: 767px) {
+        div.dt-container div.dt-layout-row:not(.dt-layout-table) {
+        display: inline-block;
+        }
     }
     </style>
 </head>

@@ -19,7 +19,10 @@ $provedor	   = "XYZ";
 $site		   = "www.xyz.com.br";
 
 //IP do MkAuth WhatsApp Send Message
-$mwsm		   = "127.0.0.1";
+$wsip		   = "127.0.0.1";
+
+//Token do MkAuth WhatsApp Send Message
+$token		   = "MEU_TOKEN";
 
 //Ajusta fuso horário do PHP
 date_default_timezone_set('America/Sao_Paulo');
@@ -27,22 +30,22 @@ date_default_timezone_set('America/Sao_Paulo');
 //Envio automático: Quantos dias antes do prazo
 //Para os títulos no prazo
 //Lembre de configurar o cron conforme o tutorial
-$diasnoprazo   = 3;
+$diasnoprazo   = 1;
 
 //Envio automático: Quantos dias após vencer
 //Para os títulos vencidos
 //Lembre de configurar o cron conforme o tutorial
-$diasvencido   = 3;
+$diasvencido   = 1;
 
 //Envio automático: Quantos dias após pago
 //Para os títulos pagos
 //Lembre de configurar o cron conforme o tutorial
-$diaspago      = 3;
+$diaspago      = 1;
 
 //Tempo de pausa de envio entre os clientes
 //Tempo mínimo = 30 segundos, máximmo = 120 segundos
 //Valores em segundos
-$tempomin      = 30;
+$tempomin      = 10;
 $tempomax      = 120;
 
 
