@@ -36,7 +36,7 @@ log "🚀 Iniciando instalação em sistema Debian-like ($LOCAL_IP)..."
 log "📦 Instalando dependências de rede e sistema, aguarde..."
 echo "Apt::Cmd::Disable-Script-Warning true;" > /etc/apt/apt.conf.d/90disablescriptwarning
 apt update -qq
-apt install -y apache2 apache2-utils sqlite3 php php-mysql php-sqlite3 php-curl git curl mysql-client sshpass >/dev/null
+apt install -y -qq apache2 apache2-utils sqlite3 php php-mysql php-sqlite3 php-curl git curl mysql-client sshpass >/dev/null
 
 # 3. Automação SSH no MK-Auth
 echo -e "\n--- Configuração do Servidor MK-Auth (Configurar acesso ao banco de dados) ---"
