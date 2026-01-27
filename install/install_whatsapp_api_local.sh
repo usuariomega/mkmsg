@@ -5,53 +5,158 @@
 
 set -e
 
-# Configurações
-APP_NAME="whatsapp-api"
-APP_DIR="$HOME/whatsapp-server"
-NODE_VERSION=22
-PORT=8000
-USER_NAME=$(whoami)
-HOME_DIR=$HOME
-FIXED_TOKEN="MEU_TOKEN"
-
 # Cores para logs
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+BLUE='\033[0;34m'
 NC='\033[0m'
 
 log() { echo -e "${GREEN}[INFO]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+info() { echo -e "${BLUE}[MENU]${NC} $1"; }
+
+# Detectar o usuário que chamou o script (se foi com sudo)
+if [ -n "$SUDO_USER" ]; then
+    TARGET_USER="$SUDO_USER"
+    TARGET_HOME=$(eval echo ~$SUDO_USER)
+else
+    TARGET_USER=$(whoami)
+    TARGET_HOME=$HOME
+fi
+
+# Configurações
+APP_NAME="whatsapp-api"
+APP_DIR="$TARGET_HOME/whatsapp-server"
+NODE_VERSION=22
+PORT=8000
+
+log "🚀 Iniciando instalação da API WhatsApp..."
+log "Usuário de instalação: $TARGET_USER"
+log "Diretório: $APP_DIR"
+echo ""
+
+# ============================================
+# GERENCIAMENTO DE TOKEN
+# ============================================
+
+FIXED_TOKEN=""
+
+# 1. Verificar se token foi passado como argumento
+if [ -n "$1" ]; then
+    FIXED_TOKEN="$1"
+    log "📌 Token recebido como argumento: $FIXED_TOKEN"
+fi
+
+# 2. Se não recebeu token, tentar obter do config.php local
+if [ -z "$FIXED_TOKEN" ]; then
+    if [ -f "/var/www/html/mkmsg/config.php" ]; then
+        FIXED_TOKEN=$(grep '\$token' /var/www/html/mkmsg/config.php | grep -oP '"\K[^"]+' | head -1)
+        if [ -n "$FIXED_TOKEN" ]; then
+            log "✅ Token obtido do config.php local: $FIXED_TOKEN"
+        fi
+    fi
+fi
+
+# 3. Se ainda não tem token, tentar obter do arquivo de configuração do WhatsApp (se já existe)
+if [ -z "$FIXED_TOKEN" ]; then
+    if [ -f "$APP_DIR/config.js" ]; then
+        FIXED_TOKEN=$(grep 'API_TOKEN' "$APP_DIR/config.js" | grep -oP '"\K[^"]+' | head -1)
+        if [ -n "$FIXED_TOKEN" ]; then
+            log "✅ Token obtido da instalação anterior: $FIXED_TOKEN"
+        fi
+    fi
+fi
+
+# 4. Se ainda não tem token, perguntar ao usuário
+if [ -z "$FIXED_TOKEN" ]; then
+    echo ""
+    info "Token não encontrado. Escolha uma opção:"
+    echo ""
+    echo "  1) Gerar um novo token aleatório (20 caracteres)"
+    echo "  2) Digitar um token customizado"
+    echo "  3) Obter token do config.php de outra máquina"
+    echo ""
+    
+    read -p "Digite sua escolha (1, 2 ou 3): " TOKEN_CHOICE
+    
+    if [ "$TOKEN_CHOICE" = "1" ]; then
+        log "🔑 Gerando novo token..."
+        FIXED_TOKEN=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 20)
+        log "✅ Token gerado: $FIXED_TOKEN"
+    elif [ "$TOKEN_CHOICE" = "2" ]; then
+        read -p "Digite o token (20 caracteres recomendado): " FIXED_TOKEN
+        if [ -z "$FIXED_TOKEN" ]; then
+            error "Token não pode estar vazio."
+        fi
+        log "✅ Token fornecido: $FIXED_TOKEN"
+    elif [ "$TOKEN_CHOICE" = "3" ]; then
+        echo ""
+        log "📋 Como obter o token da outra máquina:"
+        echo ""
+        echo "  1. Acesse a máquina onde o sistema MK-MSG está instalado"
+        echo ""
+        echo "  2. Execute um dos comandos abaixo:"
+        echo ""
+        echo "     Opção A (recomendado - sem sudo):"
+        echo "     cat /var/www/html/mkmsg/config.php | grep token"
+        echo ""
+        echo "     Opção B (com sudo):"
+        echo "     sudo grep token /var/www/html/mkmsg/config.php"
+        echo ""
+        echo "  3. O token aparecerá assim:"
+        echo "     \$token         = \"ABCDEF1234567890GHIJ\";"
+        echo ""
+        echo "  4. Copie apenas os 20 caracteres: ABCDEF1234567890GHIJ"
+        echo ""
+        read -p "Digite o token copiado: " FIXED_TOKEN
+        if [ -z "$FIXED_TOKEN" ]; then
+            error "Token não pode estar vazio."
+        fi
+        log "✅ Token fornecido: $FIXED_TOKEN"
+    else
+        error "Opção inválida."
+    fi
+fi
+
+echo ""
+log "🔐 Token final: $FIXED_TOKEN"
+echo ""
+
+# ============================================
+# INSTALAÇÃO
+# ============================================
 
 # 1. Limpeza
 log "🧹 Removendo instalações anteriores..."
-pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
-rm -rf "$APP_DIR"
+sudo -u "$TARGET_USER" pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
+sudo -u "$TARGET_USER" rm -rf "$APP_DIR"
 
-# 2. Sistema
+# 2. Sistema - Instalar dependências globais com sudo
 log "🚀 Instalando dependências do sistema..."
-sudo apt-get update -qq
-sudo apt-get install -y -qq curl git ca-certificates build-essential >/dev/null
+apt-get update -qq
+apt-get install -y -qq curl git ca-certificates build-essential >/dev/null
 
 # 3. Node.js & PM2
 if ! command -v node >/dev/null; then
     log "🌐 Instalando Node.js $NODE_VERSION..."
-    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo -E bash - >/dev/null
-    sudo apt-get install -y -qq nodejs >/dev/null
+    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - >/dev/null
+    apt-get install -y -qq nodejs >/dev/null
 fi
 
 if ! command -v pm2 >/dev/null; then
-    log "📦 Instalando PM2..."
-    sudo npm install -g pm2 -s
+    log "📦 Instalando PM2 globalmente..."
+    npm install -g pm2 -s
 fi
 
-# 4. Estrutura
-mkdir -p "$APP_DIR"/{auth,logs,public}
-cd "$APP_DIR"
+# 4. Estrutura - Criar diretórios locais do usuário
+log "📁 Criando estrutura de diretórios..."
+sudo -u "$TARGET_USER" mkdir -p "$APP_DIR"/{auth,logs,public}
 
 # 5. package.json
-log "📝 Configurando dependências..."
-cat > package.json <<EOF
+log "📝 Configurando dependências do projeto..."
+sudo -u "$TARGET_USER" tee "$APP_DIR/package.json" > /dev/null <<EOF
 {
   "name": "whatsapp-api",
   "version": "1.0.0",
@@ -65,17 +170,20 @@ cat > package.json <<EOF
 }
 EOF
 
-npm install --quiet
+log "📦 Instalando dependências do projeto (npm install)..."
+sudo -u "$TARGET_USER" bash -c "cd $APP_DIR && npm install --quiet"
 
 # 6. Configuração
-cat > config.js <<EOF
+log "⚙️  Criando arquivo de configuração..."
+sudo -u "$TARGET_USER" tee "$APP_DIR/config.js" > /dev/null <<EOF
 export const API_TOKEN = "${FIXED_TOKEN}"
 export const MESSAGE_DELAY = 3000
 export const PORT = ${PORT}
 EOF
 
 # 7. queue.js
-cat > queue.js <<'EOF'
+log "📝 Criando gerenciador de fila..."
+sudo -u "$TARGET_USER" tee "$APP_DIR/queue.js" > /dev/null <<'EOF'
 import fs from 'fs'
 import path from 'path'
 import { MESSAGE_DELAY } from './config.js'
@@ -125,9 +233,9 @@ async function processQueue(){
 }
 EOF
 
-# 8. index.js (BROWSER ALTERADO PARA CHROME/macOS)
-#Versões em: https://chromereleases.googleblog.com/search/label/Stable%20updates
-cat > index.js <<'EOF'
+# 8. index.js
+log "📝 Criando servidor Express..."
+sudo -u "$TARGET_USER" tee "$APP_DIR/index.js" > /dev/null <<'EOF'
 import express from 'express'
 import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
 import QRCode from 'qrcode'
@@ -170,8 +278,6 @@ async function connectToWhatsApp() {
   sock = makeWASocket({
     auth: state,
     logger: pino({ level: 'silent' }),
-    // ALTERAÇÃO AQUI: Identifica-se como um navegador Chrome real no Windows
-    // Isso aparece no seu celular como "Google Chrome (Windows)"
     browser: ['macOS', 'Chrome', '144.0.7559.96']
   })
 
@@ -206,7 +312,8 @@ connectToWhatsApp()
 EOF
 
 # 9. Dashboard (HTML)
-cat > public/index.html <<'EOF'
+log "📝 Criando dashboard web..."
+sudo -u "$TARGET_USER" tee "$APP_DIR/public/index.html" > /dev/null <<'EOF'
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -266,7 +373,8 @@ setInterval(up,5000);up();
 EOF
 
 # 10. Debug
-cat > debug.sh <<EOF
+log "📝 Criando script de debug..."
+sudo -u "$TARGET_USER" tee "$APP_DIR/debug.sh" > /dev/null <<EOF
 #!/bin/bash
 echo "--- STATUS PM2 ---"
 pm2 status $APP_NAME
@@ -274,10 +382,11 @@ echo ""
 echo "--- ÚLTIMOS LOGS (ARQUIVO) ---"
 ls -t logs/*.log | head -n 1 | xargs tail -n 20
 EOF
-chmod +x debug.sh
+sudo -u "$TARGET_USER" chmod +x "$APP_DIR/debug.sh"
 
-# 11. PHP
-cat > exemplo.php <<EOF
+# 11. PHP (exemplo de integração)
+log "📝 Criando exemplo de integração PHP..."
+sudo -u "$TARGET_USER" tee "$APP_DIR/exemplo.php" > /dev/null <<EOF
 <?php
 \$api_url = 'http://localhost:${PORT}/send';
 \$api_token = '${FIXED_TOKEN}';
@@ -289,11 +398,26 @@ echo "Resposta: " . \$result . PHP_EOL;
 ?>
 EOF
 
-# 12. Finalização
+# 12. Finalização - PM2 com sudo apenas para startup
 log "🚀 Iniciando com PM2..."
-pm2 start index.js --name "$APP_NAME" --silent
-pm2 save --silent
-sudo pm2 startup systemd -u "$USER_NAME" --hp "$HOME_DIR" --silent
+sudo -u "$TARGET_USER" pm2 start "$APP_DIR/index.js" --name "$APP_NAME" --silent
+sudo -u "$TARGET_USER" pm2 save --silent
 
+log "⚙️  Configurando PM2 para iniciar automaticamente no boot..."
+pm2 startup systemd -u "$TARGET_USER" --hp "$TARGET_HOME" --silent
 
-
+log "✅ INSTALAÇÃO DA API WHATSAPP CONCLUÍDA!"
+log "-------------------------------------------------------"
+log "📁 Diretório: $APP_DIR"
+log "🌐 URL: http://localhost:${PORT}"
+log "📊 Dashboard: http://localhost:${PORT}/"
+log "🔑 Token: ${FIXED_TOKEN}"
+log "👤 Usuário: $TARGET_USER"
+log "-------------------------------------------------------"
+log "📝 Comandos úteis:"
+log "   Ver status: pm2 status"
+log "   Ver logs: pm2 logs $APP_NAME"
+log "   Parar: pm2 stop $APP_NAME"
+log "   Reiniciar: pm2 restart $APP_NAME"
+log "   Remover: pm2 delete $APP_NAME"
+log "-------------------------------------------------------"
