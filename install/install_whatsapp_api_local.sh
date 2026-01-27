@@ -31,13 +31,13 @@ rm -rf "$APP_DIR"
 # 2. Sistema
 log "🚀 Instalando dependências do sistema..."
 sudo apt update -y
-sudo apt install -y curl git ca-certificates build-essential >/dev/null
+sudo apt install -y curl git ca-certificates build-essential
 
 # 3. Node.js & PM2
 if ! command -v node >/dev/null; then
     log "🌐 Instalando Node.js $NODE_VERSION..."
     curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo -E bash - >/dev/null
-    sudo apt install -y nodejs >/dev/null
+    sudo apt install -y nodejs
 fi
 
 if ! command -v pm2 >/dev/null; then

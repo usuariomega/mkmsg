@@ -35,7 +35,7 @@ log "🚀 Iniciando instalação em sistema Debian-like ($LOCAL_IP)..."
 # 2. Instalação de Dependências Iniciais
 log "📦 Instalando dependências de rede e sistema, aguarde..."
 apt update -y
-apt install -y apache2 apache2-utils sqlite3 php php-mysql php-sqlite3 php-curl git curl mysql-client sshpass >/dev/null
+apt install -y apache2 apache2-utils sqlite3 php php-mysql php-sqlite3 php-curl git curl mysql-client sshpass
 
 # 3. Automação SSH no MK-Auth
 echo -e "\n--- Configuração do Servidor MK-Auth (Configurar acesso ao banco de dados) ---"
