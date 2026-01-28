@@ -55,7 +55,7 @@ if [ "$IS_PRIVATE" = false ]; then
     error "FALHA DE SEGURANÇA: O servidor possui um IP público ($LOCAL_IP). Este sistema só permite instalação em rede local (IP Privado). Abortando."
 fi
 
-log "🚀 Iniciando instalação do sistema MK-MSG em Debian-like ($LOCAL_IP)..."
+log "🚀 Iniciando instalação do sistema MK-MSG"
 
 # 2. Instalação de Dependências Iniciais
 log "📦 Instalando dependências de rede e sistema, aguarde..."
@@ -65,19 +65,27 @@ apt-get install -y -qq apache2 apache2-utils sqlite3 php php-mysql php-sqlite3 p
 
 # 3. Automação SSH no MK-Auth
 echo -e "\n--- Configuração do Servidor MK-Auth (Configurar acesso ao banco de dados) ---"
-read -p "IP do Servidor MK-Auth: " MK_IP
 
-# Validar se o IP do MK-Auth é privado
-IP_VALIDATION=$(validate_private_ip "$MK_IP")
-if [ "$IP_VALIDATION" = "invalid_format" ]; then
-    error "ERRO: IP inválido ($MK_IP). Por favor, digite um IP válido no formato xxx.xxx.xxx.xxx"
-fi
+# Loop para validar IP do MK-Auth
+while true; do
+    read -p "IP do Servidor MK-Auth: " MK_IP
+    
+    # Validar se o IP do MK-Auth é privado
+    IP_VALIDATION=$(validate_private_ip "$MK_IP")
+    if [ "$IP_VALIDATION" = "invalid_format" ]; then
+        warn "❌ ERRO: IP inválido ($MK_IP). Por favor, digite um IP válido no formato xxx.xxx.xxx.xxx"
+        continue
+    fi
+    
+    if [ "$IP_VALIDATION" = "public" ]; then
+        warn "❌ FALHA DE SEGURANÇA: O servidor MK-Auth possui um IP público ($MK_IP). Este sistema só permite conexão com servidores em rede local (IP Privado)."
+        continue
+    fi
+    
+    log "✅ IP do MK-Auth validado como privado ($MK_IP)"
+    break
+done
 
-if [ "$IP_VALIDATION" = "public" ]; then
-    error "FALHA DE SEGURANÇA: O servidor MK-Auth possui um IP público ($MK_IP). Este sistema só permite conexão com servidores em rede local (IP Privado). Abortando."
-fi
-
-log "✅ IP do MK-Auth validado como privado ($MK_IP)"
 read -p "Usuário SSH do MK-Auth (padrão: root): " MK_SSH_USER
 MK_SSH_USER=${MK_SSH_USER:-root}
 
