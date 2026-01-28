@@ -13,27 +13,44 @@ log() { echo -e "${GREEN}[INFO]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
-# Função para validar se um IP é privado
+# Função para validar se um IP é válido e privado
 validate_private_ip() {
     local ip=$1
-    local is_private=false
     
-    # Validar formato básico do IP
-    if ! [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+    # Validar formato: deve ter exatamente 4 octetos separados por pontos
+    if ! [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         echo "invalid_format"
         return
     fi
     
+    # Separar os octetos
+    IFS='.' read -r octet1 octet2 octet3 octet4 <<< "$ip"
+    
+    # Validar se cada octeto está entre 0 e 255
+    for octet in $octet1 $octet2 $octet3 $octet4; do
+        if ! [[ $octet =~ ^[0-9]+$ ]] || [ "$octet" -lt 0 ] || [ "$octet" -gt 255 ]; then
+            echo "invalid_format"
+            return
+        fi
+    done
+    
     # Verificar se é IP privado (10.x.x.x, 172.16-31.x.x, 192.168.x.x)
-    if [[ $ip =~ ^10\. ]] || [[ $ip =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || [[ $ip =~ ^192\.168\. ]]; then
-        is_private=true
+    if [[ $ip =~ ^10\. ]]; then
+        echo "private"
+        return
     fi
     
-    if [ "$is_private" = true ]; then
+    if [[ $ip =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]]; then
         echo "private"
-    else
-        echo "public"
+        return
     fi
+    
+    if [[ $ip =~ ^192\.168\. ]]; then
+        echo "private"
+        return
+    fi
+    
+    echo "public"
 }
 
 # 1. Verificações de Segurança e Ambiente
@@ -72,8 +89,9 @@ while true; do
     
     # Validar se o IP do MK-Auth é privado
     IP_VALIDATION=$(validate_private_ip "$MK_IP")
+    
     if [ "$IP_VALIDATION" = "invalid_format" ]; then
-        warn "❌ ERRO: IP inválido ($MK_IP). Por favor, digite um IP válido no formato xxx.xxx.xxx.xxx"
+        warn "❌ ERRO: IP inválido ($MK_IP). Por favor, digite um IP válido no formato xxx.xxx.xxx.xxx (cada octeto entre 0-255)"
         continue
     fi
     

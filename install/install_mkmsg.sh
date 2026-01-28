@@ -24,6 +24,46 @@ SCRIPT_WHATSAPP="$GITHUB_REPO/install_whatsapp_api_local.sh"
 TEMP_DIR=$(mktemp -d)
 trap "rm -rf $TEMP_DIR" EXIT
 
+# Função para validar se um IP é válido e privado
+validate_private_ip() {
+    local ip=$1
+    
+    # Validar formato: deve ter exatamente 4 octetos separados por pontos
+    if ! [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "invalid_format"
+        return
+    fi
+    
+    # Separar os octetos
+    IFS='.' read -r octet1 octet2 octet3 octet4 <<< "$ip"
+    
+    # Validar se cada octeto está entre 0 e 255
+    for octet in $octet1 $octet2 $octet3 $octet4; do
+        if ! [[ $octet =~ ^[0-9]+$ ]] || [ "$octet" -lt 0 ] || [ "$octet" -gt 255 ]; then
+            echo "invalid_format"
+            return
+        fi
+    done
+    
+    # Verificar se é IP privado (10.x.x.x, 172.16-31.x.x, 192.168.x.x)
+    if [[ $ip =~ ^10\. ]]; then
+        echo "private"
+        return
+    fi
+    
+    if [[ $ip =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]]; then
+        echo "private"
+        return
+    fi
+    
+    if [[ $ip =~ ^192\.168\. ]]; then
+        echo "private"
+        return
+    fi
+    
+    echo "public"
+}
+
 # 1. Verificações de Segurança e Ambiente
 if [ "$EUID" -ne 0 ]; then 
     error "Por favor, execute como root (use sudo)."
