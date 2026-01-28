@@ -170,8 +170,8 @@ sudo -u "$TARGET_USER" tee "$APP_DIR/package.json" > /dev/null <<EOF
 }
 EOF
 
-log "📦 Instalando dependências do projeto (npm install)..."
-sudo -u "$TARGET_USER" bash -c "cd $APP_DIR && npm install --quiet"
+log "💾 Instalando dependências do projeto (npm install)..."
+sudo -u "$TARGET_USER" bash -c "cd $APP_DIR && npm install --quiet --no-fund --no-audit 2>&1 | grep -v 'npm notice' | grep -v 'npm warn' || true"
 
 # 6. Configuração
 log "⚙️  Criando arquivo de configuração..."
