@@ -161,10 +161,13 @@ log "⚙️ Configurando MySQL remotamente no MK-Auth..."
 REMOTE_SCRIPT="
 sed -i 's/bind-address.*/bind-address = $MK_IP/' /etc/mysql/conf.d/50-server.cnf
 service mysql restart
+sleep 3
+service freeradius restart
 mysql -u root -p$MK_ROOT_PASS -e \"DROP USER IF EXISTS '$MK_USER'@'$LOCAL_IP'; CREATE USER '$MK_USER'@'$LOCAL_IP' IDENTIFIED BY '$MK_PASS'; GRANT SELECT ON mkradius.* TO '$MK_USER'@'$LOCAL_IP'; FLUSH PRIVILEGES;\"
 "
 
 sshpass -p "$MK_SSH_PASS" ssh -o StrictHostKeyChecking=no "$MK_SSH_USER@$MK_IP" "$REMOTE_SCRIPT"
+log "✅ MySQL reiniciado com sucesso no MK-Auth"
 
 # 4. Personalização do Provedor
 echo -e "\n--- Personalização do Provedor ---"
