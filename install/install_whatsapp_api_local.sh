@@ -5,14 +5,6 @@
 
 set -e
 
-# Configurações
-APP_NAME="whatsapp-api"
-APP_DIR="$HOME/whatsapp-server"
-NODE_VERSION=22
-PORT=8000
-USER_NAME=$(whoami)
-HOME_DIR=$HOME
-
 # Cores para logs
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -25,13 +17,23 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 info() { echo -e "${BLUE}[MENU]${NC} $1"; }
 
-# Verificar se está sendo executado como root
-if [ "$EUID" -eq 0 ]; then 
-    error "Este script NÃO deve ser executado como root. Execute sem sudo."
+# Detectar o usuário que chamou o script (se foi com sudo)
+if [ -n "$SUDO_USER" ]; then
+    TARGET_USER="$SUDO_USER"
+    TARGET_HOME=$(eval echo ~$SUDO_USER)
+else
+    TARGET_USER=$(whoami)
+    TARGET_HOME=$HOME
 fi
 
+# Configurações
+APP_NAME="whatsapp-api"
+APP_DIR="$TARGET_HOME/whatsapp-server"
+NODE_VERSION=22
+PORT=8000
+
 log "🚀 Iniciando instalação da API WhatsApp..."
-log "Usuário: $USER_NAME"
+log "Usuário de instalação: $TARGET_USER"
 log "Diretório: $APP_DIR"
 echo ""
 
@@ -128,34 +130,33 @@ echo ""
 
 # 1. Limpeza
 log "🧹 Removendo instalações anteriores..."
-pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
-rm -rf "$APP_DIR"
+sudo -u "$TARGET_USER" pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
+sudo -u "$TARGET_USER" rm -rf "$APP_DIR"
 
 # 2. Sistema - Instalar dependências globais com sudo
 log "🚀 Instalando dependências do sistema..."
-sudo apt-get update -qq
-sudo apt-get install -y -qq curl git ca-certificates build-essential >/dev/null
+apt-get update -qq
+apt-get install -y -qq curl git ca-certificates build-essential >/dev/null
 
 # 3. Node.js & PM2
 if ! command -v node >/dev/null; then
     log "🌐 Instalando Node.js $NODE_VERSION..."
-    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo -E bash - >/dev/null
-    sudo apt-get install -y -qq nodejs >/dev/null
+    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - >/dev/null
+    apt-get install -y -qq nodejs >/dev/null
 fi
 
 if ! command -v pm2 >/dev/null; then
     log "📦 Instalando PM2 globalmente..."
-    sudo npm install -g pm2 -s
+    npm install -g pm2 -s
 fi
 
 # 4. Estrutura - Criar diretórios locais do usuário
 log "📁 Criando estrutura de diretórios..."
-mkdir -p "$APP_DIR"/{auth,logs,public}
-cd "$APP_DIR"
+sudo -u "$TARGET_USER" mkdir -p "$APP_DIR"/{auth,logs,public}
 
 # 5. package.json
 log "📝 Configurando dependências do projeto..."
-cat > package.json <<EOF
+sudo -u "$TARGET_USER" tee "$APP_DIR/package.json" > /dev/null <<EOF
 {
   "name": "whatsapp-api",
   "version": "1.0.0",
@@ -170,11 +171,11 @@ cat > package.json <<EOF
 EOF
 
 log "📦 Instalando dependências do projeto (npm install)..."
-npm install --quiet
+sudo -u "$TARGET_USER" bash -c "cd $APP_DIR && npm install --quiet"
 
 # 6. Configuração
 log "⚙️  Criando arquivo de configuração..."
-cat > config.js <<EOF
+sudo -u "$TARGET_USER" tee "$APP_DIR/config.js" > /dev/null <<EOF
 export const API_TOKEN = "${FIXED_TOKEN}"
 export const MESSAGE_DELAY = 3000
 export const PORT = ${PORT}
@@ -182,7 +183,7 @@ EOF
 
 # 7. queue.js
 log "📝 Criando gerenciador de fila..."
-cat > queue.js <<'EOF'
+sudo -u "$TARGET_USER" tee "$APP_DIR/queue.js" > /dev/null <<'EOF'
 import fs from 'fs'
 import path from 'path'
 import { MESSAGE_DELAY } from './config.js'
@@ -234,7 +235,7 @@ EOF
 
 # 8. index.js
 log "📝 Criando servidor Express..."
-cat > index.js <<'EOF'
+sudo -u "$TARGET_USER" tee "$APP_DIR/index.js" > /dev/null <<'EOF'
 import express from 'express'
 import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
 import QRCode from 'qrcode'
@@ -312,7 +313,7 @@ EOF
 
 # 9. Dashboard (HTML)
 log "📝 Criando dashboard web..."
-cat > public/index.html <<'EOF'
+sudo -u "$TARGET_USER" tee "$APP_DIR/public/index.html" > /dev/null <<'EOF'
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -373,7 +374,7 @@ EOF
 
 # 10. Debug
 log "📝 Criando script de debug..."
-cat > debug.sh <<EOF
+sudo -u "$TARGET_USER" tee "$APP_DIR/debug.sh" > /dev/null <<EOF
 #!/bin/bash
 echo "--- STATUS PM2 ---"
 pm2 status $APP_NAME
@@ -381,11 +382,11 @@ echo ""
 echo "--- ÚLTIMOS LOGS (ARQUIVO) ---"
 ls -t logs/*.log | head -n 1 | xargs tail -n 20
 EOF
-chmod +x debug.sh
+sudo -u "$TARGET_USER" chmod +x "$APP_DIR/debug.sh"
 
 # 11. PHP (exemplo de integração)
 log "📝 Criando exemplo de integração PHP..."
-cat > exemplo.php <<EOF
+sudo -u "$TARGET_USER" tee "$APP_DIR/exemplo.php" > /dev/null <<EOF
 <?php
 \$api_url = 'http://localhost:${PORT}/send';
 \$api_token = '${FIXED_TOKEN}';
@@ -399,11 +400,11 @@ EOF
 
 # 12. Finalização - PM2 com sudo apenas para startup
 log "🚀 Iniciando com PM2..."
-pm2 start index.js --name "$APP_NAME" --silent
-pm2 save --silent
+sudo -u "$TARGET_USER" pm2 start "$APP_DIR/index.js" --name "$APP_NAME" --silent
+sudo -u "$TARGET_USER" pm2 save --silent
 
 log "⚙️  Configurando PM2 para iniciar automaticamente no boot..."
-sudo pm2 startup systemd -u "$USER_NAME" --hp "$HOME_DIR" --silent
+pm2 startup systemd -u "$TARGET_USER" --hp "$TARGET_HOME" --silent
 
 log "✅ INSTALAÇÃO DA API WHATSAPP CONCLUÍDA!"
 log "-------------------------------------------------------"
@@ -411,6 +412,7 @@ log "📁 Diretório: $APP_DIR"
 log "🌐 URL: http://localhost:${PORT}"
 log "📊 Dashboard: http://localhost:${PORT}/"
 log "🔑 Token: ${FIXED_TOKEN}"
+log "👤 Usuário: $TARGET_USER"
 log "-------------------------------------------------------"
 log "📝 Comandos úteis:"
 log "   Ver status: pm2 status"
