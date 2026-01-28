@@ -39,7 +39,7 @@ O **MK-MSG** é uma solução profissional e automatizada para provedores de int
 2.  Execute o comando abaixo:
 
 ```bash
-wget https://raw.githubusercontent.com/usuariomega/mkmsg/refs/heads/main/install/install_mkmsg.sh && sudo bash install_mkmsg.sh
+wget https://raw.githubusercontent.com/usuariomega/mkmsg/main/install/install_mkmsg.sh && sudo bash install_mkmsg.sh
 ```
 
 #### 📝 O que o instalador fará por você:
