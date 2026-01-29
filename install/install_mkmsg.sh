@@ -73,6 +73,10 @@ if [ ! -f /etc/debian_version ]; then
     error "Este script é exclusivo para sistemas baseados em Debian (Ubuntu, Mint, etc). Instalação abortada."
 fi
 
+if grep -qi "devuan" /etc/os-release; then
+    error "INSTALAÇÃO CANCELADA: Este sistema não pode ser instalado dentro do MK-Auth. Use o MK-MSG em uma máquina separada."
+fi
+
 LOCAL_IP=$(hostname -I | awk '{print $1}')
 IS_PRIVATE=false
 if [[ $LOCAL_IP =~ ^10\. ]] || [[ $LOCAL_IP =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || [[ $LOCAL_IP =~ ^192\.168\. ]]; then
@@ -87,20 +91,29 @@ log "🚀 Bem-vindo ao Instalador MK-MSG!"
 log "IP Local Detectado: $LOCAL_IP"
 echo ""
 
-# 2. Menu de Seleção
-info "Escolha o que deseja instalar:"
-echo ""
-echo "  1) Sistema MK-MSG + API WhatsApp"
-echo "  2) Apenas Sistema MK-MSG"
-echo "  3) Apenas API WhatsApp"
-echo ""
-
-read -p "Digite sua escolha (1, 2 ou 3): " CHOICE
-
-# Validar entrada
-if [[ ! "$CHOICE" =~ ^[1-3]$ ]]; then
-    error "Opção inválida. Por favor, escolha 1, 2 ou 3."
-fi
+# 2. Menu de Seleção com Loop de Validação
+while true; do
+    info "Escolha o que deseja instalar:"
+    echo ""
+    echo "  1) Sistema MK-MSG + API WhatsApp"
+    echo "  2) Apenas Sistema MK-MSG"
+    echo "  3) Apenas API WhatsApp"
+    echo "  0) Sair"
+    echo ""
+    
+    read -p "Digite sua escolha (0, 1, 2 ou 3): " CHOICE
+    
+    # Validar entrada
+    if [ "$CHOICE" = "0" ]; then
+        log "Instalador cancelado pelo usuário."
+        exit 0
+    elif [[ "$CHOICE" =~ ^[1-3]$ ]]; then
+        break
+    else
+        warn "❌ Opção inválida. Por favor, escolha 0, 1, 2 ou 3."
+        echo ""
+    fi
+done
 
 echo ""
 
