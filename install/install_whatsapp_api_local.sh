@@ -140,19 +140,19 @@ sudo -u "$TARGET_USER" rm -rf "$APP_DIR"
 
 # 2. Sistema - Instalar dependências globais com sudo
 log "🚀 Instalando dependências do sistema..."
-apt-get update -qq
-apt-get install -y -qq curl git ca-certificates build-essential >/dev/null
+sudo apt-get update -qq
+sudo apt-get install -y -qq curl git ca-certificates build-essential >/dev/null
 
 # 3. Node.js & PM2
 if ! command -v node >/dev/null; then
     log "🌐 Instalando Node.js $NODE_VERSION..."
-    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - >/dev/null
-    apt-get install -y -qq nodejs >/dev/null
+    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo bash - >/dev/null
+    sudo apt-get install -y -qq nodejs >/dev/null
 fi
 
 if ! command -v pm2 >/dev/null; then
-    log "📦 Instalando PM2 globalmente..."
-    npm install -g pm2 -s
+    log "💾 Instalando PM2 globalmente..."
+    sudo npm install -g pm2 -s
 fi
 
 # 4. Estrutura - Criar diretórios locais do usuário
