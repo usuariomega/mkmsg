@@ -3,8 +3,6 @@
 # WhatsApp API - Script de Instalação 
 # ====================================
 
-set -e
-
 # Cores para logs
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -411,7 +409,7 @@ sudo -u "$TARGET_USER" pm2 start "$APP_DIR/index.js" --name "$APP_NAME" --silent
 sudo -u "$TARGET_USER" pm2 save --silent
 
 log "⚙️  Configurando PM2 para iniciar automaticamente no boot..."
-pm2 startup systemd -u "$TARGET_USER" --hp "$TARGET_HOME" --silent
+pm2 startup systemd -u "$TARGET_USER" --hp "$TARGET_HOME" --silent || true
 
 log "✅ INSTALAÇÃO DA API WHATSAPP CONCLUÍDA!"
 log "-------------------------------------------------------"
