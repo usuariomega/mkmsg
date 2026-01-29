@@ -250,8 +250,10 @@ import { API_TOKEN, PORT } from './config.js'
 import { addToQueue, getQueueSize, getSentLogs } from './queue.js'
 
 const app = express()
+const __dirname = new URL('.', import.meta.url).pathname
 app.use(express.json())
 app.use(express.static('public'))
+app.get('/', (req, res) => res.sendFile(__dirname + 'public/index.html'))
 
 let sock, status = 'disconnected', qrBase64 = null
 
@@ -312,7 +314,7 @@ app.post('/send', auth, (req, res) => {
   } catch (e) { res.json({ status: 'error' }); }
 })
 
-app.listen(PORT, () => console.log(`🚀 Servidor na porta ${PORT}`))
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Servidor na porta ${PORT}`))
 connectToWhatsApp()
 EOF
 
@@ -413,11 +415,12 @@ pm2 startup systemd -u "$TARGET_USER" --hp "$TARGET_HOME" --silent
 
 log "✅ INSTALAÇÃO DA API WHATSAPP CONCLUÍDA!"
 log "-------------------------------------------------------"
-log "📁 Diretório: $APP_DIR"
-log "🌐 URL: http://localhost:${PORT}"
-log "📊 Dashboard: http://localhost:${PORT}/"
-log "🔑 Token: ${FIXED_TOKEN}"
+log "🌐 Abra a página para ler o QR Code:"
+log "   http://localhost:${PORT}"
+log ""
+log "🔑 Token da API: ${FIXED_TOKEN}"
 log "👤 Usuário: $TARGET_USER"
+log "📁 Diretório: $APP_DIR"
 log "-------------------------------------------------------"
 log "📝 Comandos úteis:"
 log "   Ver status: pm2 status"
