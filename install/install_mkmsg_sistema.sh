@@ -62,6 +62,10 @@ if [ ! -f /etc/debian_version ]; then
     error "Este script é exclusivo para sistemas baseados em Debian (Ubuntu, Mint, etc). Instalação abortada."
 fi
 
+if grep -qi "devuan" /etc/os-release; then
+    error "INSTALAÇÃO CANCELADA: Este sistema não pode ser instalado dentro do MK-Auth. Use o MK-MSG em uma máquina separada."
+fi
+
 LOCAL_IP=$(hostname -I | awk '{print $1}')
 IS_PRIVATE=false
 if [[ $LOCAL_IP =~ ^10\. ]] || [[ $LOCAL_IP =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || [[ $LOCAL_IP =~ ^192\.168\. ]]; then

@@ -17,6 +17,11 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 info() { echo -e "${BLUE}[MENU]${NC} $1"; }
 
+# Verificar se está sendo instalado em Devuan (MK-Auth)
+if grep -qi "devuan" /etc/os-release; then
+    error "INSTALAÇÃO CANCELADA: Este sistema não pode ser instalado dentro do MK-Auth. Use o MK-MSG em uma máquina separada."
+fi
+
 # Detectar o usuário que chamou o script (se foi com sudo)
 if [ -n "$SUDO_USER" ]; then
     TARGET_USER="$SUDO_USER"
