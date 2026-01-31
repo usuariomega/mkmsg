@@ -202,20 +202,60 @@ while true; do
 done
 
 # 6. Token da API WhatsApp
-echo -e "\n--- Token da API WhatsApp ---"
-log "💡 DICA: Se você já tem uma instalação em outro computador, pode pegar o token em:"
-log "   - sudo nano /var/www/mkmsg/config.php"
-log "   - sudo nano \$HOME/whatsapp-api/config.js"
-echo ""
 
-while true; do
-    read -p "Token da API WhatsApp (20 caracteres): " API_TOKEN
-    if [ ${#API_TOKEN} -ne 20 ]; then
-        warn "❌ ERRO: O token deve ter exatamente 20 caracteres. Você digitou ${#API_TOKEN}."
-        continue
+# Detectar o usuário que chamou o script (se foi com sudo)
+if [ -n "$SUDO_USER" ]; then
+    TARGET_USER="$SUDO_USER"
+    TARGET_HOME=$(eval echo ~$SUDO_USER)
+else
+    TARGET_USER=$(whoami)
+    TARGET_HOME=$HOME
+fi
+
+# Configurações
+APP_DIR="$TARGET_HOME/whatsapp-server"
+
+API_TOKEN=""
+
+#Se ainda não tem token, tentar obter do arquivo de configuração do WhatsApp (se já existe)
+if [ -z "$API_TOKEN" ]; then
+    if [ -f "$APP_DIR/config.js" ]; then
+        API_TOKEN=$(grep 'API_TOKEN' "$APP_DIR/config.js" | grep -oP '"\K[^"]+' | head -1)
+        if [ -n "$API_TOKEN" ]; then
+            log "✅ Token obtido da instalação anterior: $API_TOKEN"
+        fi
     fi
-    break
-done
+fi
+
+#Se ainda não tem token, perguntar ao usuário
+if [ -z "$API_TOKEN" ]; then
+    echo ""
+    info "Token não encontrado. Escolha uma opção:"
+    echo ""
+    echo "  1) Gerar um novo token aleatório (20 caracteres)"
+    echo "  2) Digitar um token customizado"
+    echo ""
+    
+    read -p "Digite sua escolha (1 ou 2): " TOKEN_CHOICE
+    
+    if [ "$TOKEN_CHOICE" = "1" ]; then
+        log "🔑 Gerando novo token..."
+        API_TOKEN=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 20)
+        log "✅ Token gerado: $API_TOKEN"
+    elif [ "$TOKEN_CHOICE" = "2" ]; then
+        read -p "Digite o token (20 caracteres recomendado): " API_TOKEN
+        if [ -z "$API_TOKEN" ]; then
+            error "Token não pode estar vazio."
+        fi
+        log "✅ Token fornecido: $API_TOKEN"
+    else
+        error "Opção inválida."
+    fi
+fi
+
+echo ""
+log "🔐 Token: $API_TOKEN"
+echo ""
 
 # 7. Clonar Repositório e Configurar Sistema
 log "📥 Clonando repositório do MK-MSG..."
