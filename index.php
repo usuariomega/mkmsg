@@ -1,4 +1,85 @@
 <?php
+if (isset($_POST['ajax_send']) || isset($_POST['get_all_ids'])) {
+    ob_start();
+    include 'header.php'; 
+    ob_clean();
+    
+    if (isset($_POST['ajax_send'])) {
+        $contato = $_POST['contato'];
+        $db = new SQLite3('db/msgdb.sqlite3');
+        $msgnoprazo = $db->querySingle("SELECT msg FROM msgnoprazo");
+        $db->close();
+        
+        $nome = isset($contato['nome_res']) ? $contato['nome_res'] : 'N/A';
+        $celular = isset($contato['celular']) ? $contato['celular'] : '';
+        $datavenc = isset($contato['datavenc']) ? $contato['datavenc'] : '';
+        $linhadig = isset($contato['linhadig']) ? $contato['linhadig'] : '';
+        $qrcode = isset($contato['qrcode']) ? $contato['qrcode'] : '';
+
+        $buscar = array('/%provedor%/', '/%nomeresumido%/', '/%vencimento%/', '/%linhadig%/', '/%copiacola%/', '/%site%/');
+        $substituir = array($provedor, $nome, $datavenc, $linhadig, $qrcode, $site);
+        $msgFinal = preg_replace($buscar, $substituir, $msgnoprazo);
+
+        $payload = ["numero" => "55" . $celular, "mensagem" => $msgFinal];
+        $ch = curl_init("http://$wsip:8000/send");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_HTTPHEADER => ["Content-Type: application/json", "x-api-token: $token"],
+            CURLOPT_TIMEOUT => 10
+        ]);
+        $response = curl_exec($ch);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        // Validação da resposta da API
+        $apiSuccess = false;
+        if (!$error) {
+            $resData = json_decode($response, true);
+            // Verifica se a API retornou status de sucesso (ajuste conforme o retorno real da sua API)
+            if (isset($resData['status']) && ($resData['status'] === 'sent' || $resData['status'] === true)) {
+                $apiSuccess = true;
+            } elseif (isset($resData['key'])) { // Algumas APIs retornam um objeto 'key' em caso de sucesso
+                $apiSuccess = true;
+            }
+        }
+
+        $month = date("Y-m");
+        $root = $_SERVER["DOCUMENT_ROOT"] . "/mkmsg";
+        $dir = "$root/logs/$month/noprazo";
+        if (!is_dir($dir)) { mkdir($dir, 0755, true); }
+
+        $logFile = "$dir/noprazo_" . date("d-M-Y") . ".log";
+        $logData = sprintf("%s;%s;%s;%s\n", date("d-m-Y"), date("H:i:s"), $nome, $error ?: $response);
+        file_put_contents($logFile, $logData, FILE_APPEND);
+
+        header('Content-Type: application/json');
+        echo json_encode(["success" => $apiSuccess, "nome" => $nome, "response" => $error ?: $response]);
+        exit;
+    }
+
+    if (isset($_POST['get_all_ids'])) {
+        $conn = new mysqli($servername, $username, $password, $dbname);
+        $sql_todos = "SELECT upper(vtab_titulos.nome_res) as nome_res, REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS celular, 
+                      DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS datavenc, 
+                      vtab_titulos.linhadig, sis_qrpix.qrcode 
+                      FROM vtab_titulos 
+                      INNER JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo 
+                      WHERE vtab_titulos.status = 'aberto' 
+                      AND vtab_titulos.cli_ativado = 's' 
+                      AND MONTH(vtab_titulos.datavenc) = MONTH(CURDATE()) 
+                      AND YEAR(vtab_titulos.datavenc) = YEAR(CURDATE())
+                      GROUP BY vtab_titulos.uuid_lanc
+                      ORDER BY nome_res ASC";
+        $res_todos = $conn->query($sql_todos);
+        $todos = [];
+        while ($row = $res_todos->fetch_assoc()) { $todos[] = $row; }
+        header('Content-Type: application/json');
+        echo json_encode($todos);
+        exit;
+    }
+}
+
 include 'header.php';
 
 ini_set('display_errors', 1);
@@ -16,12 +97,16 @@ $offset = ($page - 1) * $limit;
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) { die("Erro de conexão: " . $conn->connect_error); }
 
-$where_clause = "WHERE vtab_titulos.status = 'aberto' AND vtab_titulos.cli_ativado = 's' AND vtab_titulos.datavenc >= CURDATE()";
+$where_clause = "WHERE vtab_titulos.status = 'aberto' 
+                 AND vtab_titulos.cli_ativado = 's' 
+                 AND MONTH(vtab_titulos.datavenc) = MONTH(CURDATE()) 
+                 AND YEAR(vtab_titulos.datavenc) = YEAR(CURDATE())";
+
 if (!empty($search)) {
     $where_clause .= " AND (vtab_titulos.nome_res LIKE ? OR vtab_titulos.celular LIKE ?)";
 }
 
-$count_sql = "SELECT COUNT(*) as total FROM vtab_titulos $where_clause";
+$count_sql = "SELECT COUNT(DISTINCT vtab_titulos.uuid_lanc) as total FROM vtab_titulos $where_clause";
 $stmt_count = $conn->prepare($count_sql);
 if (!empty($search)) {
     $search_param = "%$search%";
@@ -37,6 +122,7 @@ $sql = "SELECT vtab_titulos.uuid_lanc, upper(vtab_titulos.nome_res) as nome_res,
         FROM vtab_titulos 
         INNER JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo 
         $where_clause 
+        GROUP BY vtab_titulos.uuid_lanc
         ORDER BY $order_by $order_dir 
         LIMIT ? OFFSET ?";
 
@@ -51,101 +137,6 @@ $result = $stmt->get_result();
 $dados_pagina = [];
 while ($row = $result->fetch_assoc()) {
     $dados_pagina[] = $row;
-}
-
-function enviarMensagem($contato, $msgnoprazo, $vars, $wsip, $token, $tempomin, $tempomax) {
-    $nome = $contato['nome_res'];
-    $celular = $contato['celular'];
-    $datavenc = $contato['datavenc'];
-    $linhadig = $contato['linhadig'];
-    $qrcode = $contato['qrcode'];
-
-    $buscar = array('/%provedor%/', '/%nomeresumido%/', '/%vencimento%/', '/%linhadig%/', '/%copiacola%/', '/%site%/');
-    $substituir = array($vars['provedor'], $nome, $datavenc, $linhadig, $qrcode, $vars['site']);
-    $msgFinal = preg_replace($buscar, $substituir, $msgnoprazo);
-
-    $payload = ["numero" => "55" . $celular, "mensagem" => $msgFinal];
-    $ch = curl_init("http://$wsip:8000/send");
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => json_encode($payload),
-        CURLOPT_HTTPHEADER => ["Content-Type: application/json", "x-api-token: $token"],
-        CURLOPT_TIMEOUT => 10
-    ]);
-    $response = curl_exec($ch);
-    $error = curl_error($ch);
-    curl_close($ch);
-
-    $month = date("Y-m");
-    $root = $_SERVER["DOCUMENT_ROOT"] . "/mkmsg";
-    $dir = "$root/logs/$month/noprazo";
-
-    if (!is_dir($dir)) {
-        mkdir($dir, 0755, true);
-        if (file_exists("$root/logs/.ler/modelo/index.php")) {
-            copy("$root/logs/.ler/modelo/index.php", "$dir/index.php");
-        }
-    }
-
-    $logFile = "$dir/noprazo_" . date("d-M-Y") . ".log";
-    $logData = sprintf("%s;%s;%s;%s\n", date("d-m-Y"), date("H:i:s"), $nome, $error ?: $response);
-    file_put_contents($logFile, $logData, FILE_APPEND);
-
-    echo "<br>Enviando para: <b>$nome</b>... " . ($error ? "Erro: $error" : "Resposta: $response");
-    ob_flush(); flush();
-    if ($tempomax > 0) { sleep(rand($tempomin, $tempomax)); }
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $db = new SQLite3('db/msgdb.sqlite3');
-    $msgnoprazo = $db->querySingle("SELECT msg FROM msgnoprazo");
-    $db->close();
-    $vars = ['provedor' => $provedor, 'site' => $site];
-    
-    if (isset($_POST['posttodos'])) {
-        $sql_todos = "SELECT upper(vtab_titulos.nome_res) as nome_res, REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS celular, 
-                      DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS datavenc, 
-                      vtab_titulos.linhadig, sis_qrpix.qrcode 
-                      FROM vtab_titulos 
-                      INNER JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo 
-                      WHERE vtab_titulos.status = 'aberto' AND vtab_titulos.cli_ativado = 's' AND vtab_titulos.datavenc >= CURDATE()
-                      ORDER BY nome_res ASC";
-        $stmt_todos = $conn->prepare($sql_todos);
-        $stmt_todos->execute();
-        $res_todos = $stmt_todos->get_result();
-        
-        echo '<div id="overlay" class="overlay" style="display: flex;">';
-        echo '<div class="card">';
-        echo '<h3>📤 Processando Envios (Todos No Prazo)...</h3>';
-        echo '<div id="overlay-content">';
-        
-        if (ob_get_level() == 0) ob_start();
-        while ($contato = $res_todos->fetch_assoc()) {
-            enviarMensagem($contato, $msgnoprazo, $vars, $wsip, $token, $tempomin, $tempomax);
-        }
-        echo '<div class="badge badge-success mt-3" style="font-size: 16px; padding: 12px 24px;">✅ Fim do processamento!</div>';
-        echo '<br><button class="button mt-3" onclick="window.location.href=\'index.php\'">Fechar</button>';
-        echo '</div></div></div>';
-        ob_end_flush();
-        exit;
-    } elseif (isset($_POST['postsel']) && isset($_POST['selected_data'])) {
-        $selected_items = json_decode($_POST['selected_data'], true);
-        
-        echo '<div id="overlay" class="overlay" style="display: flex;">';
-        echo '<div class="card">';
-        echo '<h3>📤 Processando Envios Selecionados...</h3>';
-        echo '<div id="overlay-content">';
-        
-        if (ob_get_level() == 0) ob_start();
-        foreach ($selected_items as $contato) {
-            enviarMensagem($contato, $msgnoprazo, $vars, $wsip, $token, $tempomin, $tempomax);
-        }
-        echo '<div class="badge badge-success mt-3" style="font-size: 16px; padding: 12px 24px;">✅ Fim do processamento!</div>';
-        echo '<br><button class="button mt-3" onclick="window.location.href=\'index.php\'">Fechar</button>';
-        echo '</div></div></div>';
-        ob_end_flush();
-        exit;
-    }
 }
 ?>
 
@@ -234,19 +225,84 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <div class="menu mt-3">
-            <button class="button" name="posttodos" type="submit" onclick="return confirm('✅ Enviar para TODOS os <?= $total_registros ?> registros no prazo?')" style="background-color: var(--success);">📤 Enviar para todos</button>
-            <button class="button" name="postsel" type="submit" style="background-color: var(--secondary);">📨 Enviar selecionados</button>
+            <button class="button" id="btn-todos" type="button" style="background-color: var(--success);">📤 Enviar para todos</button>
+            <button class="button" id="btn-sel" type="button" style="background-color: var(--secondary);">📨 Enviar selecionados</button>
             <button class="button3" onclick="window.open('logs/', '_blank')" type="button">📋 Logs</button>
         </div>
     </form>
 </div>
 
+<!-- Overlay de Processamento -->
+<div id="overlay" class="overlay" style="display: none;">
+    <div class="card" style="max-width: 500px; width: 90%;">
+        <h3 id="overlay-title">📤 Processando Envios...</h3>
+        <div id="overlay-progress" style="margin: 10px 0; font-weight: bold;">Progresso: 0/0</div>
+        <div id="overlay-content" style="max-height: 300px; overflow-y: auto; text-align: left; font-size: 14px; border: 1px solid #eee; padding: 10px; background: #f9f9f9;">
+        </div>
+        <div id="overlay-footer" class="mt-3">
+            <button id="btn-parar" class="button" style="background-color: var(--danger);">🛑 Parar Envio</button>
+            <button id="btn-fechar" class="button" style="display: none;" onclick="location.reload()">Fechar</button>
+        </div>
+    </div>
+</div>
+
 <script>
 const STORAGE_KEY = 'mkmsg_selected_noprazo';
+let isStopped = false;
+
 function getSelected() { const data = sessionStorage.getItem(STORAGE_KEY); return data ? JSON.parse(data) : {}; }
 function saveSelected(selected) { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(selected)); updateSelectedCount(); }
 function updateSelectedCount() { const selected = getSelected(); const count = Object.keys(selected).length; $('#selected-count').text(count); }
 function clearSelection() { if(confirm('Deseja limpar todos os itens selecionados?')) { sessionStorage.removeItem(STORAGE_KEY); $('.row-check').prop('checked', false); $('#select_all').prop('checked', false); updateSelectedCount(); } }
+
+async function processarEnvios(lista) {
+    isStopped = false;
+    $('#overlay').css('display', 'flex');
+    $('#overlay-content').html('');
+    $('#btn-parar').show();
+    $('#btn-fechar').hide();
+    
+    const total = lista.length;
+    $('#overlay-progress').text(`Progresso: 0/${total}`);
+
+    for (let i = 0; i < total; i++) {
+        if (isStopped) {
+            $('#overlay-content').append('<br><b style="color:red;">⚠️ Processamento interrompido pelo usuário.</b>');
+            break;
+        }
+
+        const contato = lista[i];
+        $('#overlay-progress').text(`Progresso: ${i + 1}/${total}`);
+        
+        try {
+            const response = await $.ajax({
+                url: 'index.php',
+                method: 'POST',
+                data: { ajax_send: true, contato: contato },
+                dataType: 'json'
+            });
+            
+            const status = response.success ? '<span style="color:green;">Sucesso</span>' : '<span style="color:red;">Falha (Verifique o Log)</span>';
+            $('#overlay-content').append(`<br>Enviando para: <b>${response.nome}</b>... ${status}`);
+            $('#overlay-content').scrollTop($('#overlay-content')[0].scrollHeight);
+        } catch (e) {
+            const nomeErro = contato.nome_res || 'Cliente';
+            $('#overlay-content').append(`<br><span style="color:red;">Erro de conexão ao enviar para ${nomeErro}</span>`);
+        }
+
+        // Delay entre envios
+        const tempomin = <?= (int)$tempomin ?>;
+        const tempomax = <?= (int)$tempomax ?>;
+        if (tempomax > 0) {
+            const delay = Math.floor(Math.random() * (tempomax - tempomin + 1) + tempomin) * 1000;
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+
+    $('#overlay-content').append('<br><div class="badge badge-success mt-3">✅ Fim do processamento!</div>');
+    $('#btn-parar').hide();
+    $('#btn-fechar').show();
+}
 
 $(document).ready(function() {
     const selected = getSelected();
@@ -255,6 +311,7 @@ $(document).ready(function() {
         const id = row.data('id');
         if (selected[id]) { $(this).prop('checked', true); }
     });
+
     $('.row-check').on('change', function() {
         const row = $(this).closest('tr');
         const id = row.data('id');
@@ -264,26 +321,38 @@ $(document).ready(function() {
         } else { delete currentSelected[id]; }
         saveSelected(currentSelected);
     });
+
     $('#select_all').on('click', function() {
         const isChecked = this.checked;
         $('.row-check').each(function() { $(this).prop('checked', isChecked).trigger('change'); });
     });
-    $('#form').on('submit', function(e) {
-        const btnName = $(document.activeElement).attr('name');
-        if (btnName === 'postsel') {
-            const currentSelected = getSelected();
-            const selectedArray = Object.values(currentSelected);
-            if (selectedArray.length === 0) { alert('⚠️ Por favor, selecione pelo menos um cliente!'); e.preventDefault(); return false; }
-            if (confirm('📨 Confirma o Envio para ' + selectedArray.length + ' cliente(s) selecionados?')) {
-                $('#selected_data').val(JSON.stringify(selectedArray));
-                sessionStorage.removeItem(STORAGE_KEY);
-                return true;
-            } else { e.preventDefault(); return false; }
+
+    $('#btn-parar').on('click', function() {
+        isStopped = true;
+        $(this).prop('disabled', true).text('Parando...');
+    });
+
+    $('#btn-todos').on('click', function() {
+        if (confirm('✅ Enviar para TODOS os <?= $total_registros ?> registros no prazo?')) {
+            $.post('index.php', { get_all_ids: true }, function(data) {
+                const lista = (typeof data === 'string') ? JSON.parse(data) : data;
+                processarEnvios(lista);
+            });
         }
     });
+
+    $('#btn-sel').on('click', function() {
+        const currentSelected = getSelected();
+        const selectedArray = Object.values(currentSelected);
+        if (selectedArray.length === 0) { alert('⚠️ Por favor, selecione pelo menos um cliente!'); return; }
+        if (confirm('📨 Confirma o Envio para ' + selectedArray.length + ' cliente(s) selecionados?')) {
+            sessionStorage.removeItem(STORAGE_KEY);
+            processarEnvios(selectedArray);
+        }
+    });
+
     updateSelectedCount();
 });
 </script>
 </body>
 </html>
-

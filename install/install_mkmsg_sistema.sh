@@ -30,9 +30,13 @@ validate_private_ip() {
             return
         fi
     done
-    if [[ $ip =~ ^10\. ]] || [[ $ip =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || [[ $ip =~ ^192\.168\. ]]; then
-        echo "private"
-        return
+    
+    if [[ $ip =~ ^10\. ]] || \
+       [[ $ip =~ ^100\.(6[4-9]|7[0-9]|8[0-9]|9[0-9]|1[0-1][0-9]|12[0-7])\. ]] || \
+       [[ $ip =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || \
+       [[ $ip =~ ^192\.168\. ]]; then
+            echo "private"
+            return
     fi
     echo "public"
 }
@@ -51,8 +55,10 @@ if grep -qi "devuan" /etc/os-release; then
 fi
 
 LOCAL_IP=$(hostname -I | awk '{print $1}')
+ip_type=$(validate_private_ip "$LOCAL_IP")
 IS_PRIVATE=false
-if [[ $LOCAL_IP =~ ^10\. ]] || [[ $LOCAL_IP =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || [[ $LOCAL_IP =~ ^192\.168\. ]]; then
+
+if [[ "$ip_type" == "private" ]]; then
     IS_PRIVATE=true
 fi
 
@@ -66,7 +72,7 @@ log "🚀 Iniciando instalação do sistema MK-MSG"
 log "📦 Instalando dependências de rede e sistema, aguarde..."
 echo "Apt::Cmd::Disable-Script-Warning true;" > /etc/apt/apt.conf.d/90disablescriptwarning
 apt-get update -qq
-apt-get install -y -qq apache2 apache2-utils sqlite3 php php-mysql php-sqlite3 php-curl git curl mysql-client sshpass supervisor >/dev/null
+apt-get install -y -qq apache2 apache2-utils sqlite3 php php-mysql php-sqlite3 php-curl git curl sshpass supervisor >/dev/null
 
 # 3. Automação SSH no MK-Auth
 echo -e "\n--- Configuração do Servidor MK-Auth (Configurar acesso ao banco de dados) ---"
@@ -228,30 +234,34 @@ if [ -z "$API_TOKEN" ]; then
 fi
 
 #Se ainda não tem token, perguntar ao usuário
-if [ -z "$API_TOKEN" ]; then
-    echo ""
-    info "Token não encontrado. Escolha uma opção:"
-    echo ""
-    echo "  1) Gerar um novo token aleatório (20 caracteres)"
-    echo "  2) Digitar um token customizado"
-    echo ""
-    
-    read -p "Digite sua escolha (1 ou 2): " TOKEN_CHOICE
-    
-    if [ "$TOKEN_CHOICE" = "1" ]; then
-        log "🔑 Gerando novo token..."
-        API_TOKEN=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 20)
-        log "✅ Token gerado: $API_TOKEN"
-    elif [ "$TOKEN_CHOICE" = "2" ]; then
-        read -p "Digite o token (20 caracteres recomendado): " API_TOKEN
-        if [ -z "$API_TOKEN" ]; then
-            error "Token não pode estar vazio."
+while true; do
+    if [ -z "$API_TOKEN" ]; then
+        echo ""
+        echo "Token não encontrado. Escolha uma opção:"
+        echo ""
+        echo "  1) Gerar um novo token aleatório (20 caracteres)"
+        echo "  2) Digitar um token customizado"
+        echo ""
+        
+        read -p "Digite sua escolha (1 ou 2): " TOKEN_CHOICE
+        
+        if [ "$TOKEN_CHOICE" = "1" ]; then
+            log "🔑 Gerando novo token..."
+            API_TOKEN=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 20)
+            log "✅ Token gerado: $API_TOKEN"
+            break
+        elif [ "$TOKEN_CHOICE" = "2" ]; then
+            read -p "Digite o token (20 caracteres recomendado): " API_TOKEN
+            if [ -z "$API_TOKEN" ]; then
+                error "Token não pode estar vazio."
+            fi
+            log "✅ Token fornecido: $API_TOKEN"
+            break
+        else
+            warn "❌ Opção inválida. Por favor, escolha 1 ou 2."
         fi
-        log "✅ Token fornecido: $API_TOKEN"
-    else
-        error "Opção inválida."
     fi
-fi
+done
 
 echo ""
 log "🔐 Token: $API_TOKEN"
@@ -338,13 +348,25 @@ sed -i "s/\$provedor = .*/\$provedor = \"$PROVEDOR_NOME\";/" "$CONFIG_FILE"
 sed -i "s/\$site = .*/\$site = \"$PROVEDOR_SITE\";/" "$CONFIG_FILE"
 sed -i "s/\$token = .*/\$token = \"$API_TOKEN\";/" "$CONFIG_FILE"
 
-# 9. Instalar e Configurar Supervisor + Daemon
-log "🤖 Configurando sistema de automação com Supervisor..."
+# 9. Permissões e Apache
+log "🔐 Configurando permissões e Apache..."
+chown -R www-data:www-data $INSTALL_DIR
+chmod -R 755 "$INSTALL_DIR/db/" "$INSTALL_DIR/logs/"
+sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
+sed -i 's/ServerTokens OS/ServerTokens Prod/' /etc/apache2/conf-enabled/security.conf
+sed -i 's/ServerSignature On/ServerSignature Off/' /etc/apache2/conf-enabled/security.conf
+systemctl restart apache2
+
+# 10. Instalar e Configurar Supervisor + Daemon + Rotação de Logs Mensal
+log "🤖 Configurando sistema de automação com Supervisor e Rotação Mensal..."
+
+# Criar diretório de logs e ajustar permissões
 mkdir -p /var/log/mkmsg
 chown www-data:www-data /var/log/mkmsg
 
+# Configuração do Supervisor
 cat > /etc/supervisor/conf.d/daemon.conf << 'SUPERVISOR_EOF'
-[program:mkmsg-daemon]
+[program:mkmsg]
 command=/usr/bin/php /var/www/html/mkmsg/daemon.php
 directory=/var/www/html/mkmsg
 autostart=true
@@ -358,21 +380,34 @@ priority=999
 stopwaitsecs=10
 SUPERVISOR_EOF
 
+# Configuração do Logrotate para gerar logs mensais
+# Isso criará arquivos como daemon_output.log.1.gz todo mês
+cat > /etc/logrotate.d/mkmsg << 'LOGROTATE_EOF'
+/var/log/mkmsg/*.log {
+    monthly
+    missingok
+    rotate 12
+    compress
+    delaycompress
+    notifempty
+    create 0640 www-data www-data
+    sharedscripts
+    postrotate
+        # Avisa o Supervisor para reabrir os arquivos de log após a rotação
+        /usr/bin/supervisorctl signal SIGUSR2 mkmsg > /dev/null 2>&1 || true
+    endscript
+}
+LOGROTATE_EOF
+
+# Garantir permissões no script PHP
 chmod +x "$INSTALL_DIR/daemon.php"
+
+# Recarregar Supervisor de forma silenciosa
 supervisorctl reread >/dev/null 2>&1
 supervisorctl update >/dev/null 2>&1
-supervisorctl start mkmsg-daemon >/dev/null 2>&1
+supervisorctl start mkmsg >/dev/null 2>&1
 
 log "✅ Daemon de automação configurado e iniciado!"
-
-# 10. Permissões e Apache
-log "🔐 Configurando permissões e Apache..."
-chown -R www-data:www-data "$INSTALL_DIR/db/" "$INSTALL_DIR/logs/"
-chmod -R 755 "$INSTALL_DIR/db/" "$INSTALL_DIR/logs/"
-sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
-sed -i 's/ServerTokens OS/ServerTokens Prod/' /etc/apache2/conf-enabled/security.conf
-sed -i 's/ServerSignature On/ServerSignature Off/' /etc/apache2/conf-enabled/security.conf
-systemctl restart apache2
 
 
 log ""
@@ -387,14 +422,14 @@ log "Usuário:        $WEB_USER"
 log "Senha:          $WEB_PASS"
 log ""
 log "--------------------------------------------------------"
-log "💡 AUTOMAÇÃO: O sistema usa um daemon que envia "
-log "              mensagens automaticas para os clientes "
-log "              no prazo, pagos e vencidos. A configuração "
-log "              dos horários e dias ficam no portal web "
-log "              no botão Conf. geral "
+log "💡 AUTOMAÇÃO:   O sistema usa um daemon que envia "
+log "                mensagens automaticas para os clientes "
+log "                no prazo, pagos e vencidos. A conf. "
+log "                dos horários e dias ficam no portal web "
+log "                no botão Conf. geral "
 log ""
 log "Para gerenciar o daemon:"
-log "Status:    sudo supervisorctl status mkmsg-daemon"
+log "Status:         sudo supervisorctl status mkmsg-daemon"
 log "--------------------------------------------------------"
 log ""
 log ""

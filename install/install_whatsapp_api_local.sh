@@ -15,6 +15,11 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 info() { echo -e "${BLUE}[MENU]${NC} $1"; }
 
+# 1. Verificar permissão elevada no início
+if [ "$EUID" -ne 0 ]; then 
+    error "Por favor, execute como root (use sudo)."
+fi
+
 # Verificar se está sendo instalado em Devuan (MK-Auth)
 if grep -qi "devuan" /etc/os-release; then
     error "INSTALAÇÃO CANCELADA: Este sistema não pode ser instalado dentro do MK-Auth. Use o MK-MSG em uma máquina separada."
@@ -23,7 +28,7 @@ fi
 # Detectar o usuário que chamou o script (se foi com sudo)
 if [ -n "$SUDO_USER" ]; then
     TARGET_USER="$SUDO_USER"
-    TARGET_HOME=$(eval echo ~$SUDO_USER)
+    TARGET_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
 else
     TARGET_USER=$(whoami)
     TARGET_HOME=$HOME
@@ -102,11 +107,11 @@ if [ -z "$FIXED_TOKEN" ]; then
         echo ""
         echo "  2. Execute um dos comandos abaixo:"
         echo ""
-        echo "     Opção A (recomendado - sem sudo):"
+        echo "     Opção A (recomendado):"
         echo "     cat /var/www/html/mkmsg/config.php | grep token"
         echo ""
-        echo "     Opção B (com sudo):"
-        echo "     sudo grep token /var/www/html/mkmsg/config.php"
+        echo "     Opção B:"
+        echo "     grep token /var/www/html/mkmsg/config.php"
         echo ""
         echo "  3. O token aparecerá assim:"
         echo "     \$token         = \"ABCDEF1234567890GHIJ\";"
@@ -133,33 +138,34 @@ echo ""
 
 # 1. Limpeza
 log "🧹 Removendo instalações anteriores..."
-sudo -u "$TARGET_USER" pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
-sudo -u "$TARGET_USER" rm -rf "$APP_DIR"
+su - "$TARGET_USER" -c "pm2 delete $APP_NAME >/dev/null 2>&1 || true"
+rm -rf "$APP_DIR"
 
-# 2. Sistema - Instalar dependências globais com sudo
+# 2. Sistema - Instalar dependências globais
 log "🚀 Instalando dependências do sistema..."
-sudo apt-get update -qq
-sudo apt-get install -y -qq curl git ca-certificates build-essential >/dev/null
+apt-get update -qq
+apt-get install -y -qq curl git ca-certificates build-essential >/dev/null
 
 # 3. Node.js & PM2
 if ! command -v node >/dev/null; then
     log "🌐 Instalando Node.js $NODE_VERSION..."
-    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo bash - >/dev/null
-    sudo apt-get install -y -qq nodejs >/dev/null
+    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - >/dev/null
+    apt-get install -y -qq nodejs >/dev/null
 fi
 
 if ! command -v pm2 >/dev/null; then
     log "💾 Instalando PM2 globalmente..."
-    sudo npm install -g pm2 -s
+    npm install -g pm2 -s
 fi
 
 # 4. Estrutura - Criar diretórios locais do usuário
 log "📁 Criando estrutura de diretórios..."
-sudo -u "$TARGET_USER" mkdir -p "$APP_DIR"/{auth,logs,public}
+mkdir -p "$APP_DIR"/{auth,logs,public}
+chown -R "$TARGET_USER":"$TARGET_USER" "$APP_DIR"
 
 # 5. package.json
 log "📝 Configurando dependências do projeto..."
-sudo -u "$TARGET_USER" tee "$APP_DIR/package.json" > /dev/null <<EOF
+cat <<EOF > "$APP_DIR/package.json"
 {
   "name": "whatsapp-api",
   "version": "1.0.0",
@@ -172,21 +178,23 @@ sudo -u "$TARGET_USER" tee "$APP_DIR/package.json" > /dev/null <<EOF
   }
 }
 EOF
+chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/package.json"
 
 log "💾 Instalando dependências do projeto (npm install)..."
-sudo -u "$TARGET_USER" bash -c "cd $APP_DIR && npm install --quiet --no-fund --no-audit 2>&1 | grep -v 'npm notice' | grep -v 'npm warn' || true"
+su - "$TARGET_USER" -c "cd $APP_DIR && npm install --quiet --no-fund --no-audit 2>&1 | grep -v 'npm notice' | grep -v 'npm warn' || true"
 
 # 6. Configuração
 log "⚙️  Criando arquivo de configuração..."
-sudo -u "$TARGET_USER" tee "$APP_DIR/config.js" > /dev/null <<EOF
+cat <<EOF > "$APP_DIR/config.js"
 export const API_TOKEN = "${FIXED_TOKEN}"
 export const MESSAGE_DELAY = 3000
 export const PORT = ${PORT}
 EOF
+chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/config.js"
 
 # 7. queue.js
 log "📝 Criando gerenciador de fila..."
-sudo -u "$TARGET_USER" tee "$APP_DIR/queue.js" > /dev/null <<'EOF'
+cat <<'EOF' > "$APP_DIR/queue.js"
 import fs from 'fs'
 import path from 'path'
 import { MESSAGE_DELAY } from './config.js'
@@ -235,10 +243,11 @@ async function processQueue(){
   setTimeout(() => { processing = false; processQueue() }, MESSAGE_DELAY)
 }
 EOF
+chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/queue.js"
 
 # 8. index.js
 log "📝 Criando servidor Express..."
-sudo -u "$TARGET_USER" tee "$APP_DIR/index.js" > /dev/null <<'EOF'
+cat <<'EOF' > "$APP_DIR/index.js"
 import express from 'express'
 import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
 import QRCode from 'qrcode'
@@ -312,13 +321,16 @@ app.post('/send', auth, (req, res) => {
   } catch (e) { res.json({ status: 'error' }); }
 })
 
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Servidor na porta ${PORT}`))
-connectToWhatsApp()
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${PORT}`)
+  connectToWhatsApp()
+})
 EOF
+chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/index.js"
 
 # 9. Dashboard (HTML)
 log "📝 Criando dashboard web..."
-sudo -u "$TARGET_USER" tee "$APP_DIR/public/index.html" > /dev/null <<'EOF'
+cat <<'EOF' > "$APP_DIR/public/index.html"
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -376,10 +388,11 @@ setInterval(up,5000);up();
 </body>
 </html>
 EOF
+chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/public/index.html"
 
 # 10. Debug
 log "📝 Criando script de debug..."
-sudo -u "$TARGET_USER" tee "$APP_DIR/debug.sh" > /dev/null <<EOF
+cat <<EOF > "$APP_DIR/debug.sh"
 #!/bin/bash
 echo "--- STATUS PM2 ---"
 pm2 status $APP_NAME
@@ -387,11 +400,12 @@ echo ""
 echo "--- ÚLTIMOS LOGS (ARQUIVO) ---"
 ls -t logs/*.log | head -n 1 | xargs tail -n 20
 EOF
-sudo -u "$TARGET_USER" chmod +x "$APP_DIR/debug.sh"
+chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/debug.sh"
+chmod +x "$APP_DIR/debug.sh"
 
 # 11. PHP (exemplo de integração)
 log "📝 Criando exemplo de integração PHP..."
-sudo -u "$TARGET_USER" tee "$APP_DIR/exemplo.php" > /dev/null <<EOF
+cat <<EOF > "$APP_DIR/exemplo.php"
 <?php
 \$api_url = 'http://localhost:${PORT}/send';
 \$api_token = '${FIXED_TOKEN}';
@@ -402,15 +416,21 @@ sudo -u "$TARGET_USER" tee "$APP_DIR/exemplo.php" > /dev/null <<EOF
 echo "Resposta: " . \$result . PHP_EOL;
 ?>
 EOF
+chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/exemplo.php"
 
-# 12. Finalização - PM2 com sudo apenas para startup
-log "🚀 Iniciando com PM2..."
-sudo -u "$TARGET_USER" pm2 start "$APP_DIR/index.js" --name "$APP_NAME" --silent
-sudo -u "$TARGET_USER" pm2 save --silent
+# 12. Iniciar com PM2 e configurar Startup
+log "🚀 Iniciando a API com PM2..."
+su - "$TARGET_USER" -c "cd $APP_DIR && pm2 start index.js --name $APP_NAME --silent"
+su - "$TARGET_USER" -c "pm2 save --silent"
 
 log "⚙️  Configurando PM2 para iniciar automaticamente no boot..."
-pm2 startup systemd -u "$TARGET_USER" --hp "$TARGET_HOME" --silent || true
-
+# O comando 'pm2 startup' gera um comando que deve ser rodado como root
+STARTUP_CMD=$(su - "$TARGET_USER" -c "pm2 startup systemd" | grep "sudo" | sed 's/sudo //')
+if [ -n "$STARTUP_CMD" ]; then
+    eval "$STARTUP_CMD" >/dev/null 2>&1
+fi
+echo ""
+echo ""
 log "✅ INSTALAÇÃO DA API WHATSAPP CONCLUÍDA!"
 log "-------------------------------------------------------"
 log "🌐 Abra a página para ler o QR Code:"
@@ -427,3 +447,5 @@ log "   Parar: pm2 stop $APP_NAME"
 log "   Reiniciar: pm2 restart $APP_NAME"
 log "   Remover: pm2 delete $APP_NAME"
 log "-------------------------------------------------------"
+echo ""
+echo ""
