@@ -338,7 +338,16 @@ sed -i "s/\$provedor = .*/\$provedor = \"$PROVEDOR_NOME\";/" "$CONFIG_FILE"
 sed -i "s/\$site = .*/\$site = \"$PROVEDOR_SITE\";/" "$CONFIG_FILE"
 sed -i "s/\$token = .*/\$token = \"$API_TOKEN\";/" "$CONFIG_FILE"
 
-# 9. Instalar e Configurar Supervisor + Daemon
+# 9. Permissões e Apache
+log "🔐 Configurando permissões e Apache..."
+chown -R www-data:www-data $INSTALL_DIR
+chmod -R 755 "$INSTALL_DIR/db/" "$INSTALL_DIR/logs/"
+sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
+sed -i 's/ServerTokens OS/ServerTokens Prod/' /etc/apache2/conf-enabled/security.conf
+sed -i 's/ServerSignature On/ServerSignature Off/' /etc/apache2/conf-enabled/security.conf
+systemctl restart apache2
+
+# 10. Instalar e Configurar Supervisor + Daemon
 log "🤖 Configurando sistema de automação com Supervisor..."
 mkdir -p /var/log/mkmsg
 chown www-data:www-data /var/log/mkmsg
@@ -364,15 +373,6 @@ supervisorctl update >/dev/null 2>&1
 supervisorctl start mkmsg-daemon >/dev/null 2>&1
 
 log "✅ Daemon de automação configurado e iniciado!"
-
-# 10. Permissões e Apache
-log "🔐 Configurando permissões e Apache..."
-chown -R www-data:www-data $INSTALL_DIR
-chmod -R 755 "$INSTALL_DIR/db/" "$INSTALL_DIR/logs/"
-sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
-sed -i 's/ServerTokens OS/ServerTokens Prod/' /etc/apache2/conf-enabled/security.conf
-sed -i 's/ServerSignature On/ServerSignature Off/' /etc/apache2/conf-enabled/security.conf
-systemctl restart apache2
 
 
 log ""
