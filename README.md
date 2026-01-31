@@ -78,7 +78,7 @@ Gerencie a conexão com a API do WhatsApp e configure os parâmetros globais de 
 2.  Execute o comando abaixo:
 
 ```bash
-wget https://raw.githubusercontent.com/usuariomega/mkmsg/main/install/install_mkmsg.sh && sudo bash install_mkmsg.sh
+curl -O https://raw.githubusercontent.com/usuariomega/mkmsg/main/install/install_mkmsg.sh && sudo bash install_mkmsg.sh
 ```
 
 ### 📝 O que o instalador fará por você:
