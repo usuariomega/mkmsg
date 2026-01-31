@@ -1,56 +1,65 @@
 <?php
 
 //IP do MK-Auth
-$servername    = "127.0.0.1";
+$servername = "127.0.0.1";
 
 //Usuário do banco de dados do do MK-Auth
-$username      = "nomedousuario";
+$username = "mkmsglerdb";
 
 //Senha do banco de dados do do MK-Auth
-$password      = "suasenha";
+$password = "mkmsgsenhadodb";
 
 //Nome do banco de dados do do MK-Auth
-$dbname        = "mkradius";
+$dbname = "mkradius";
 
 //Nome do seu provedor
-$provedor      = "XYZ";
+$provedor = "XYZ";
 
 //Site do seu provedor (OBS: não coloque https://)
-$site          = "www.xyz.com.br";
+$site = "www.xyz.com.br";
 
 //IP da API do WhatsApp
-$wsip          = "127.0.0.1";
+$wsip = "127.0.0.1";
 
 //Token da API do WhatsApp
-$token         = "MEU_TOKEN";
+$token = "MEU_TOKEN";
 
 //Ajusta fuso horário do PHP
 date_default_timezone_set('America/Sao_Paulo');
 
-//Envio automático: Quantos dias antes do prazo
+//Envio automático: Múltiplos dias antes do prazo
 //Para os títulos no prazo
-//Lembre de configurar o cron conforme o tutorial
-$diasnoprazo   = 1;
+//Formato: array de inteiros representando quantos dias antes avisar
+//Exemplo: [1, 3, 7] = avisa 1, 3 e 7 dias antes do vencimento
+$diasnoprazo = [1, 10];
 
-//Envio automático: Quantos dias após vencer
+//Envio automático: Múltiplos dias após vencer
 //Para os títulos vencidos
-//Lembre de configurar o cron conforme o tutorial
-$diasvencido   = 1;
+//Formato: array de inteiros representando quantos dias depois avisar
+//Exemplo: [1, 10, 15] = avisa 1, 10 e 15 dias depois de vencer
+$diasvencido = [1, 10];
 
-//Envio automático: Quantos dias após pago
+//Envio automático: Múltiplos dias após pago
 //Para os títulos pagos
-//Lembre de configurar o cron conforme o tutorial
-$diaspago      = 1;
+//Formato: array de inteiros representando quantos dias depois avisar
+//Exemplo: [1, 3, 7] = avisa 1, 3 e 7 dias depois de pagar
+$diaspago = [1];
+
+//Horários de envio automático (formato HH:MM)
+//O daemon verifica a cada minuto se chegou a hora de enviar
+$horario_vencido = "10:00";
+$horario_noprazo = "08:00";
+$horario_pago = "12:00";
 
 //Tempo de pausa de envio entre os clientes
 //Tempo mínimo = 30 segundos, máximmo = 120 segundos
 //Valores em segundos
-$tempomin      = 10;
-$tempomax      = 120;
+$tempomin = 10;
+$tempomax = 90;
 
 
 //Não mexa abaixo!!
-//Consultas SQL para buscar os clientes no prazo, vencidos e pagos
+//Consulta SQL para buscar os clientes no prazo (interface manual)
 $sqlnoprazo    = "SELECT upper(vtab_titulos.nome_res) as nome_res,
                  REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS `celular`,
                  DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS `datavenc`,
@@ -61,38 +70,5 @@ $sqlnoprazo    = "SELECT upper(vtab_titulos.nome_res) as nome_res,
                  AND (vtab_titulos.status = 'aberto')
                  AND (vtab_titulos.cli_ativado = 's')
                  ORDER BY nome_res ASC, datavenc ASC;";
-
-$cronnoprazo   = "SELECT upper(vtab_titulos.nome_res) as nome_res,
-                 REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS `celular`,
-                 DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS `datavenc`,
-                 vtab_titulos.linhadig, sis_qrpix.qrcode
-                 FROM vtab_titulos
-                 INNER JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo
-                 WHERE DATE_FORMAT(datavenc,'%d/%m/%y') = DATE_FORMAT(DATE_ADD(CURRENT_DATE(), INTERVAL +$diasnoprazo DAY),'%d/%m/%y')
-                 AND (vtab_titulos.status = 'aberto')
-                 AND (vtab_titulos.cli_ativado = 's')
-                 ORDER BY nome_res ASC, datavenc ASC;";
-
-$cronvencido   = "SELECT upper(vtab_titulos.nome_res) as nome_res,
-                 REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS `celular`,
-                 DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS `datavenc`,
-                 vtab_titulos.linhadig, sis_qrpix.qrcode
-                 FROM vtab_titulos
-                 INNER JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo
-                 WHERE DATE_FORMAT(datavenc,'%d/%m/%y') = DATE_FORMAT(DATE_ADD(CURRENT_DATE(), INTERVAL -$diasvencido DAY),'%d/%m/%y')
-                 AND (vtab_titulos.status = 'vencido')
-                 AND (vtab_titulos.cli_ativado = 's')
-                 ORDER BY nome_res ASC, datavenc ASC;";
-
-$cronpago      = "SELECT upper(vtab_titulos.nome_res) as nome_res,
-                 REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS `celular`,
-                 DATE_FORMAT(vtab_titulos.datapag,'%d/%m/%y') AS `datapag`,
-                 vtab_titulos.linhadig, sis_qrpix.qrcode
-                 FROM vtab_titulos
-                 INNER JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo
-                 WHERE DATE_FORMAT(datapag,'%d/%m/%y') = DATE_FORMAT(DATE_ADD(CURRENT_DATE(), INTERVAL -$diaspago DAY),'%d/%m/%y')
-                 AND (vtab_titulos.status = 'pago')
-                 AND (vtab_titulos.cli_ativado = 's')
-                 ORDER BY nome_res ASC, datapag ASC;";
 
 ?>
