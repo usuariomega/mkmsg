@@ -367,7 +367,7 @@ log "✅ Daemon de automação configurado e iniciado!"
 
 # 10. Permissões e Apache
 log "🔐 Configurando permissões e Apache..."
-chown -R www-data:www-data "$INSTALL_DIR/db/" "$INSTALL_DIR/logs/"
+chown -R www-data:www-data $INSTALL_DIR
 chmod -R 755 "$INSTALL_DIR/db/" "$INSTALL_DIR/logs/"
 sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
 sed -i 's/ServerTokens OS/ServerTokens Prod/' /etc/apache2/conf-enabled/security.conf

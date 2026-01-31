@@ -16,7 +16,11 @@ $offset = ($page - 1) * $limit;
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) { die("Erro de conexão: " . $conn->connect_error); }
 
-$where_clause = "WHERE vtab_titulos.status = 'aberto' AND vtab_titulos.cli_ativado = 's' AND vtab_titulos.datavenc >= CURDATE()";
+$where_clause = "WHERE vtab_titulos.status = 'aberto' 
+                 AND vtab_titulos.cli_ativado = 's' 
+                 AND MONTH(vtab_titulos.datavenc) = MONTH(CURDATE()) 
+                 AND YEAR(vtab_titulos.datavenc) = YEAR(CURDATE())";
+
 if (!empty($search)) {
     $where_clause .= " AND (vtab_titulos.nome_res LIKE ? OR vtab_titulos.celular LIKE ?)";
 }
