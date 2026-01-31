@@ -294,7 +294,12 @@ $config = readConfig($configFile);
             💡 Dicas Importantes
         </h4>
         <ul style="color: var(--text-secondary); margin-left: 20px; line-height: 1.8;">
-            <li><strong>Dias de Envio:</strong> Separe os dias por vírgula. Exemplo: "1, 10, 15" enviará mensagens 1, 10 e 15 dias após o vencimento.</li>
+            <li><strong>Dias de Envio:</strong> Separe os dias por vírgula. Exemplo: "1, 10" enviará mensagens 1 e 10 dias antes/após o vencimento.</li>
+            <li>Exemplo: Título vence no dia 20, hoje é dia 19. Configurar "1, 10" enviará mensagens 1 dia antes do vencimento (dia 19) e 10 dias antes do vencimento (dia 10).</li>
+            <li>Exemplo: Título venceu no dia 05, hoje é dia 06. Configurar "1, 10" enviará mensagens 1 dia depois do vencimento (dia 06) e 10 dias depois do vencimento (dia 15).</li>
+            <li>Exemplo: Título pago no dia 10, hoje é dia 11. Configurar "1" enviará mensagens 1 dia depois do pagamento (dia 11).</li>
+            <li>Exemplo: Título vence no dia 10, hoje é dia 08. Se configurado "1" o sistema não fará o envio. Aguardará até o dia 09 para enviar a mensagem.</li>
+            <li>OBS: Os valores não são aboslutos, vai depender do vencimento de cada título. O sistema irá correr todo dia no horário configurado, e verificará se há necessidade de envio ou não.</li>
             <li><strong>Tempos de Pausa:</strong> O sistema aguardará um tempo aleatório entre o mínimo e máximo configurado antes de enviar cada mensagem.</li>
             <li><strong>Horários:</strong> O daemon verifica a cada minuto. Se for 09:00 e o horário configurado for 09:00, o envio será processado.</li>
             <li><strong>Autenticação:</strong> Use suas credenciais de acesso para salvar as configurações.</li>
