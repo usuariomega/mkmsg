@@ -230,7 +230,7 @@ fi
 #Se ainda não tem token, perguntar ao usuário
 if [ -z "$API_TOKEN" ]; then
     echo ""
-    info "Token não encontrado. Escolha uma opção:"
+    echo "Token não encontrado. Escolha uma opção:"
     echo ""
     echo "  1) Gerar um novo token aleatório (20 caracteres)"
     echo "  2) Digitar um token customizado"
