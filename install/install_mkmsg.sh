@@ -27,17 +27,11 @@ trap "rm -rf $TEMP_DIR" EXIT
 # Função para validar se um IP é válido e privado
 validate_private_ip() {
     local ip=$1
-    
-    # Validar formato: deve ter exatamente 4 octetos separados por pontos
     if ! [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         echo "invalid_format"
         return
     fi
-    
-    # Separar os octetos
     IFS='.' read -r octet1 octet2 octet3 octet4 <<< "$ip"
-    
-    # Validar se cada octeto está entre 0 e 255
     for octet in $octet1 $octet2 $octet3 $octet4; do
         if ! [[ $octet =~ ^[0-9]+$ ]] || [ "$octet" -lt 0 ] || [ "$octet" -gt 255 ]; then
             echo "invalid_format"
@@ -45,22 +39,13 @@ validate_private_ip() {
         fi
     done
     
-    # Verificar se é IP privado (10.x.x.x, 172.16-31.x.x, 192.168.x.x)
-    if [[ $ip =~ ^10\. ]]; then
-        echo "private"
-        return
+    if [[ $ip =~ ^10\. ]] || \
+       [[ $ip =~ ^100\.(6[4-9]|7[0-9]|8[0-9]|9[0-9]|1[0-1][0-9]|12[0-7])\. ]] || \
+       [[ $ip =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || \
+       [[ $ip =~ ^192\.168\. ]]; then
+            echo "private"
+            return
     fi
-    
-    if [[ $ip =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]]; then
-        echo "private"
-        return
-    fi
-    
-    if [[ $ip =~ ^192\.168\. ]]; then
-        echo "private"
-        return
-    fi
-    
     echo "public"
 }
 
@@ -78,8 +63,10 @@ if grep -qi "devuan" /etc/os-release; then
 fi
 
 LOCAL_IP=$(hostname -I | awk '{print $1}')
+ip_type=$(validate_private_ip "$LOCAL_IP")
 IS_PRIVATE=false
-if [[ $LOCAL_IP =~ ^10\. ]] || [[ $LOCAL_IP =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || [[ $LOCAL_IP =~ ^192\.168\. ]]; then
+
+if [[ "$ip_type" == "private" ]]; then
     IS_PRIVATE=true
 fi
 

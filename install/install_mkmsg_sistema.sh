@@ -30,9 +30,13 @@ validate_private_ip() {
             return
         fi
     done
-    if [[ $ip =~ ^10\. ]] || [[ $ip =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || [[ $ip =~ ^192\.168\. ]]; then
-        echo "private"
-        return
+    
+    if [[ $ip =~ ^10\. ]] || \
+       [[ $ip =~ ^100\.(6[4-9]|7[0-9]|8[0-9]|9[0-9]|1[0-1][0-9]|12[0-7])\. ]] || \
+       [[ $ip =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || \
+       [[ $ip =~ ^192\.168\. ]]; then
+            echo "private"
+            return
     fi
     echo "public"
 }
@@ -51,8 +55,10 @@ if grep -qi "devuan" /etc/os-release; then
 fi
 
 LOCAL_IP=$(hostname -I | awk '{print $1}')
+ip_type=$(validate_private_ip "$LOCAL_IP")
 IS_PRIVATE=false
-if [[ $LOCAL_IP =~ ^10\. ]] || [[ $LOCAL_IP =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || [[ $LOCAL_IP =~ ^192\.168\. ]]; then
+
+if [[ "$ip_type" == "private" ]]; then
     IS_PRIVATE=true
 fi
 
