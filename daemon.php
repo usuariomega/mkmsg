@@ -53,7 +53,7 @@ function limparLocksAntigos($lockDir) {
 
 // Função para executar o envio
 function executarEnvio($tipo, $root, $lockDir) {
-    daemonLog("Iniciando envio: $tipo");
+    daemonLog("\n\nIniciando envio: $tipo");
     
     // Montar o comando curl para chamar o script de agendamento.
     $script = "$root/dm{$tipo}.php";
@@ -67,8 +67,20 @@ function executarEnvio($tipo, $root, $lockDir) {
     $cmd = "php $script posttodos=1 2>&1";
     $output = shell_exec($cmd);
     
+    // Processar o output para pegar as 5 primeiras e 2 últimas linhas
+    $lines = explode("\n", trim($output));
+    $totalLines = count($lines);
+    
+    if ($totalLines > 7) {
+        $firstFive = array_slice($lines, 0, 5);
+        $lastTwo = array_slice($lines, -2);
+        $filteredOutput = implode("\n", $firstFive) . "\n...\n" . implode("\n", $lastTwo);
+    } else {
+        $filteredOutput = $output;
+    }
+
     daemonLog("Envio concluído: $tipo");
-    daemonLog("Output: " . substr($output, 0, 200) . "...\n");
+    daemonLog("Output: \n" . $filteredOutput); 
     
     // Marcar como executado
     marcarComoExecutado($tipo, $lockDir);
