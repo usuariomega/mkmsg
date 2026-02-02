@@ -92,8 +92,6 @@
         const rows = table.querySelectorAll('tr');
         rows.forEach(row => {
             const cells = row.querySelectorAll('td');
-            // No seu .htaccess, SuppressIcon está ativo, então as colunas são:
-            // 0: Name, 1: Last Modified, 2: Size, 3: Description
             if (cells.length < 2) return; 
 
             const linkElem = cells[0].querySelector('a');
@@ -102,6 +100,7 @@
             const name = linkElem.innerText.trim();
             if (name === "Parent Directory" || name === "Diretório Pai") return;
 
+            // IMPORTANTE: Capturar o href original exatamente como o Apache gerou
             const href = linkElem.getAttribute('href');
             const isDir = href.endsWith('/');
             const date = cells[1] ? cells[1].innerText.trim() : '';

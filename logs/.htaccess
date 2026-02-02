@@ -24,12 +24,3 @@ IndexIgnore .htaccess /mkmsg/logs/share /mkmsg/logs/share/PrettyIndexTheme
 HeaderName /mkmsg/logs/share/PrettyIndexTheme/header.html
 ReadmeName /mkmsg/logs/share/PrettyIndexTheme/footer.html
 IndexStyleSheet /mkmsg/logs/share/PrettyIndexTheme/style.css
-
-#
-# DESCRIPTIONS
-#
-AddDescription "PHP Informations" phpinfo.php
-AddDescription "Text file" *.txt
-AddDescription "These are files without extension or Folders" *
-AddDescription "These are files with extensions" *.?
-
