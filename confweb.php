@@ -85,7 +85,7 @@ $message = '';
 $messageType = '';
 
 // Processar formulário
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_config'])) {
     if (saveConfig($configFile, $_POST)) {
         $message = '✅ Configurações salvas com sucesso!';
         $messageType = 'success';
@@ -98,8 +98,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $config = readConfig($configFile);
 ?>
 
-<!-- Cabeçalho da Página -->
 <div class="container">
+    <!-- Cabeçalho da Página -->
     <div class="card mb-3">
         <h2 class="title-config">
             ⚙️ Configurações do Sistema
@@ -141,6 +141,7 @@ $config = readConfig($configFile);
 
     <!-- Formulário de Configurações -->
     <form method="POST">
+        <input type="hidden" name="save_config" value="1">
         <!-- SEÇÃO: INFORMAÇÕES DO PROVEDOR -->
         <div class="card mb-3">
             <h3 style="color: var(--primary); margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--border);">
@@ -267,6 +268,41 @@ $config = readConfig($configFile);
             </div>
         </div>
 
+        <!-- NOVO BALÃO: SIMULADOR DE NOTIFICAÇÕES -->
+        <div class="card mb-3" style="border: 2px dashed var(--tertiary); background-color: var(--secondary-light);">
+            <h3 style="color: var(--tertiary); margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--tertiary);">
+                🧪 Simulador de Notificações
+            </h3>
+            
+            <p class="text-subtitle mb-3" style="font-size: 14px; color: var(--text-primary);">
+                Simule quando uma notificação será enviada com base na data do título e nos dias configurados para automação.
+            </p>
+            
+            <div class="grid-2">
+                <div>
+                    <label class="form-label">Tipo de Título</label>
+                    <select id="sim_tipo" class="form-input-full" onchange="simular()">
+                        <option value="noprazo">📅 No Prazo (Antes do Vencimento)</option>
+                        <option value="vencido">⚠️ Vencido (Após o Vencimento)</option>
+                        <option value="pago">✅ Pago (Após o Pagamento)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Data do Evento (Vencimento ou Pagamento)</label>
+                    <input type="date" id="sim_data" class="form-input-full" onchange="simular()" style="height: 48px; padding: 12px 16px; border: 2px solid var(--border); border-radius: var(--radius-md);">
+                </div>
+                <div>
+                    <label class="form-label">Dias para Notificar (ex: 3, 7)</label>
+                    <input type="text" id="sim_dias" class="form-input-full" placeholder="Ex: 1, 5, 10" oninput="simular()">
+                </div>
+                <div id="sim_resultado_container" style="display: flex; align-items: flex-end;">
+                    <div id="sim_resultado" style="width: 100%; padding: 12px; border-radius: var(--radius-md); background: white; border: 1px solid var(--border); min-height: 48px; font-size: 14px; display: flex; flex-direction: column; justify-content: center;">
+                        <span style="color: var(--text-light);">Aguardando dados...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Botão de Salvar -->
         <div class="menu mt-3">
             <button type="submit" class="button" style="background-color: var(--primary); border: 2px solid var(--primary); min-width: 300px; font-size: 16px; padding: 14px 32px;">
@@ -285,18 +321,54 @@ $config = readConfig($configFile);
         </h4>
         <ul style="color: var(--text-secondary); margin-left: 20px; line-height: 1.8;">
             <li><strong>Dias de Envio:</strong> Separe os dias por vírgula. Exemplo: "1, 10" enviará mensagens 1 e 10 dias antes/após o vencimento.</li>
-            <li>Exemplo: Título vence no dia 20, hoje é dia 19. Configurar "1, 10" enviará mensagens 1 dia antes do vencimento (dia 19) e 10 dias antes do vencimento (dia 10).</li>
-            <li>Exemplo: Título venceu no dia 05, hoje é dia 06. Configurar "1, 10" enviará mensagens 1 dia depois do vencimento (dia 06) e 10 dias depois do vencimento (dia 15).</li>
-            <li>Exemplo: Título pago no dia 10, hoje é dia 11. Configurar "1" enviará mensagens 1 dia depois do pagamento (dia 11).</li>
-            <li>Exemplo: Título vence no dia 10, hoje é dia 08. Se configurado "1" o sistema não fará o envio. Aguardará até o dia 09 para enviar a mensagem.</li>
-            <li>OBS: Os valores não são aboslutos, vai depender do vencimento de cada título. O sistema irá correr todo dia no horário configurado, e verificará se há necessidade de envio ou não.</li>
             <li><strong>Tempos de Pausa:</strong> O sistema aguardará um tempo aleatório entre o mínimo e máximo configurado antes de enviar cada mensagem.</li>
             <li><strong>Horários:</strong> O daemon verifica a cada minuto. Se for 09:00 e o horário configurado for 09:00, o envio será processado.</li>
-            <li><strong>Autenticação:</strong> Use suas credenciais de acesso para salvar as configurações.</li>
         </ul>
     </div>
 </div>
 
+<script>
+function simular() {
+    const tipo = document.getElementById('sim_tipo').value;
+    const dataStr = document.getElementById('sim_data').value;
+    const diasStr = document.getElementById('sim_dias').value;
+    const resultadoDiv = document.getElementById('sim_resultado');
+
+    if (!dataStr || !diasStr) {
+        resultadoDiv.innerHTML = '<span style="color: var(--text-light);">Aguardando dados...</span>';
+        return;
+    }
+
+    const dataBase = new Date(dataStr + 'T00:00:00');
+    const dias = diasStr.split(',').map(d => parseInt(d.trim())).filter(d => !isNaN(d));
+    
+    if (dias.length === 0) {
+        resultadoDiv.innerHTML = '<span style="color: var(--danger);">Insira dias válidos.</span>';
+        return;
+    }
+
+    let html = '<div style="font-weight: 600; margin-bottom: 5px;">Datas de Notificação:</div>';
+    
+    dias.forEach(d => {
+        let dataSimulada = new Date(dataBase);
+        if (tipo === 'noprazo') {
+            // No prazo: subtrai os dias do vencimento
+            dataSimulada.setDate(dataBase.getDate() - d);
+        } else {
+            // Vencido ou Pago: soma os dias ao evento
+            dataSimulada.setDate(dataBase.getDate() + d);
+        }
+        
+        const dataFormatada = dataSimulada.toLocaleDateString('pt-BR');
+        html += `<div>• ${d} dia(s) ${tipo === 'noprazo' ? 'antes' : 'depois'}: <b>${dataFormatada}</b></div>`;
+    });
+
+    resultadoDiv.innerHTML = html;
+}
+
+// Inicializar com a data de hoje para facilitar
+document.getElementById('sim_data').valueAsDate = new Date();
+</script>
+
 </body>
 </html>
-
