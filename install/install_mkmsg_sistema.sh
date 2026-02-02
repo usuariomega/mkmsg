@@ -353,13 +353,16 @@ sed -i 's/ServerTokens OS/ServerTokens Prod/' /etc/apache2/conf-enabled/security
 sed -i 's/ServerSignature On/ServerSignature Off/' /etc/apache2/conf-enabled/security.conf
 systemctl restart apache2
 
-# 10. Instalar e Configurar Supervisor + Daemon
-log "🤖 Configurando sistema de automação com Supervisor..."
+# 10. Instalar e Configurar Supervisor + Daemon + Rotação de Logs Mensal
+log "🤖 Configurando sistema de automação com Supervisor e Rotação Mensal..."
+
+# Criar diretório de logs e ajustar permissões
 mkdir -p /var/log/mkmsg
 chown www-data:www-data /var/log/mkmsg
 
+# Configuração do Supervisor
 cat > /etc/supervisor/conf.d/daemon.conf << 'SUPERVISOR_EOF'
-[program:mkmsg-daemon]
+[program:mkmsg]
 command=/usr/bin/php /var/www/html/mkmsg/daemon.php
 directory=/var/www/html/mkmsg
 autostart=true
@@ -373,10 +376,32 @@ priority=999
 stopwaitsecs=10
 SUPERVISOR_EOF
 
+# Configuração do Logrotate para gerar logs mensais
+# Isso criará arquivos como daemon_output.log.1.gz todo mês
+cat > /etc/logrotate.d/mkmsg << 'LOGROTATE_EOF'
+/var/log/mkmsg/*.log {
+    monthly
+    missingok
+    rotate 12
+    compress
+    delaycompress
+    notifempty
+    create 0640 www-data www-data
+    sharedscripts
+    postrotate
+        # Avisa o Supervisor para reabrir os arquivos de log após a rotação
+        /usr/bin/supervisorctl signal SIGUSR2 mkmsg > /dev/null 2>&1 || true
+    endscript
+}
+LOGROTATE_EOF
+
+# Garantir permissões no script PHP
 chmod +x "$INSTALL_DIR/daemon.php"
+
+# Recarregar Supervisor de forma silenciosa
 supervisorctl reread >/dev/null 2>&1
 supervisorctl update >/dev/null 2>&1
-supervisorctl start mkmsg-daemon >/dev/null 2>&1
+supervisorctl start mkmsg >/dev/null 2>&1
 
 log "✅ Daemon de automação configurado e iniciado!"
 
@@ -393,14 +418,14 @@ log "Usuário:        $WEB_USER"
 log "Senha:          $WEB_PASS"
 log ""
 log "--------------------------------------------------------"
-log "💡 AUTOMAÇÃO: O sistema usa um daemon que envia "
-log "              mensagens automaticas para os clientes "
-log "              no prazo, pagos e vencidos. A configuração "
-log "              dos horários e dias ficam no portal web "
-log "              no botão Conf. geral "
+log "💡 AUTOMAÇÃO:   O sistema usa um daemon que envia "
+log "                mensagens automaticas para os clientes "
+log "                no prazo, pagos e vencidos. A conf. "
+log "                dos horários e dias ficam no portal web "
+log "                no botão Conf. geral "
 log ""
 log "Para gerenciar o daemon:"
-log "Status:    sudo supervisorctl status mkmsg-daemon"
+log "Status:         sudo supervisorctl status mkmsg-daemon"
 log "--------------------------------------------------------"
 log ""
 log ""

@@ -55,8 +55,8 @@ function limparLocksAntigos($lockDir) {
 function executarEnvio($tipo, $root, $lockDir) {
     daemonLog("Iniciando envio: $tipo");
     
-    // Montar o comando curl para chamar o script de cron
-    $script = "$root/cron{$tipo}.php";
+    // Montar o comando curl para chamar o script de agendamento.
+    $script = "$root/dm{$tipo}.php";
     
     if (!file_exists($script)) {
         daemonLog("Script não encontrado: $script", "ERROR");
@@ -68,7 +68,7 @@ function executarEnvio($tipo, $root, $lockDir) {
     $output = shell_exec($cmd);
     
     daemonLog("Envio concluído: $tipo");
-    daemonLog("Output: " . substr($output, 0, 200) . "...");
+    daemonLog("Output: " . substr($output, 0, 200) . "...\n");
     
     // Marcar como executado
     marcarComoExecutado($tipo, $lockDir);

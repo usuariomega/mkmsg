@@ -1,14 +1,4 @@
 <?php
-session_start();
-
-// Verificar autenticação (usa o mesmo htpasswd do sistema)
-if (!isset($_SERVER['PHP_AUTH_USER'])) {
-    header('WWW-Authenticate: Basic realm="MK-MSG Configurações"');
-    header('HTTP/1.0 401 Unauthorized');
-    echo "Acesso negado. Autenticação necessária.";
-    exit;
-}
-
 include 'header.php';
 
 $root = $_SERVER["DOCUMENT_ROOT"] . "/mkmsg";
