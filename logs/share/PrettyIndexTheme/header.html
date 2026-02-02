@@ -1,22 +1,43 @@
- <nav class="navbar navbar-inverse navbar-fixed-top">
-  <div class="container-fluid">
-    <div class="navbar-header">
-      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#sortBar">
-        <span class="icon-bar"></span>
-        <span class="icon-bar"></span>
-        <span class="icon-bar"></span>
-      </button>
-      <a class="navbar-brand" href="" id="title">Title</a>
-    </div>
-    <div class="collapse navbar-collapse navbar-right" id="sortBar">
-      <ul class="nav navbar-nav">
-	      <li><a href="#" id="sortName">Nome</a></li>
-	      <li><a href="#" id="sortDate">Ultima modificação</a></li>
-	      <li><a href="#" id="sortSize">Tamanho</a></li>
-	      <li><a href="#" id="sortDesc">Descrição</a></li>
-      </ul>
-    </div>
-  </div>
-</nav> 
-<div class="container-fluid" style="margin-top:80px">
-<!-- we open the `wrapper` element here, but close it in the `footer.html` file -->
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Listagem de Arquivos</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome 6 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center" href="/" id="title">
+                <i class="fa-solid fa-folder-tree me-2 text-primary"></i>
+                <span>Explorador de Arquivos</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sortBar">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse justify-content-end" id="sortBar">
+                <ul class="navbar-nav">
+                    <li class="nav-item"><a class="nav-link" href="#" id="sortName"><i class="fa-solid fa-sort-alpha-down me-1"></i> Nome</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" id="sortDate"><i class="fa-solid fa-calendar-alt me-1"></i> Modificação</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" id="sortSize"><i class="fa-solid fa-weight-hanging me-1"></i> Tamanho</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" id="sortDesc"><i class="fa-solid fa-info-circle me-1"></i> Descrição</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid main-content">
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb bg-light p-3 rounded shadow-sm" id="breadcrumb-list">
+                <!-- Breadcrumb será preenchido via JS -->
+            </ol>
+        </nav>
+        <div id="file-list-container" class="row g-4">
+            <!-- O conteúdo da tabela do Apache será transformado em cards aqui -->

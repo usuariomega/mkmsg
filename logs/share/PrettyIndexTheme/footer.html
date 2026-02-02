@@ -1,298 +1,141 @@
-	<!--<div class="block">
-	</div>--/.postlisting-->
+        </div> <!-- /#file-list-container -->
+    </div> <!-- /.container-fluid -->
 
-<!--/.wrapper-->
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-<!--<div class="footer">
-</div>--/.footer-->
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const container = document.getElementById('file-list-container');
+        const breadcrumbList = document.getElementById('breadcrumb-list');
+        const table = document.querySelector('table');
+        
+        if (!table) return;
 
+        // Tradução e ícones baseados na extensão
+        function getFileInfo(name, isDir) {
+            if (isDir) return { icon: 'fa-folder icon-folder', type: 'Pasta' };
+            
+            const ext = name.split('.').pop().toLowerCase();
+            const map = {
+                'zip': { icon: 'fa-file-archive icon-archive', type: 'Arquivo Compactado' },
+                '7z': { icon: 'fa-file-archive icon-archive', type: 'Arquivo Compactado' },
+                'rar': { icon: 'fa-file-archive icon-archive', type: 'Arquivo Compactado' },
+                'gz': { icon: 'fa-file-archive icon-archive', type: 'Arquivo Compactado' },
+                'jpg': { icon: 'fa-file-image icon-image', type: 'Imagem' },
+                'jpeg': { icon: 'fa-file-image icon-image', type: 'Imagem' },
+                'png': { icon: 'fa-file-image icon-image', type: 'Imagem' },
+                'gif': { icon: 'fa-file-image icon-image', type: 'Imagem' },
+                'svg': { icon: 'fa-file-image icon-image', type: 'Imagem' },
+                'mp4': { icon: 'fa-file-video icon-video', type: 'Vídeo' },
+                'mkv': { icon: 'fa-file-video icon-video', type: 'Vídeo' },
+                'avi': { icon: 'fa-file-video icon-video', type: 'Vídeo' },
+                'mp3': { icon: 'fa-file-audio icon-audio', type: 'Áudio' },
+                'wav': { icon: 'fa-file-audio icon-audio', type: 'Áudio' },
+                'pdf': { icon: 'fa-file-pdf icon-pdf', type: 'Documento PDF' },
+                'doc': { icon: 'fa-file-word icon-word', type: 'Documento Word' },
+                'docx': { icon: 'fa-file-word icon-word', type: 'Documento Word' },
+                'xls': { icon: 'fa-file-excel icon-excel', type: 'Planilha Excel' },
+                'xlsx': { icon: 'fa-file-excel icon-excel', type: 'Planilha Excel' },
+                'ppt': { icon: 'fa-file-powerpoint icon-powerpoint', type: 'Apresentação' },
+                'pptx': { icon: 'fa-file-powerpoint icon-powerpoint', type: 'Apresentação' },
+                'txt': { icon: 'fa-file-lines icon-text', type: 'Arquivo de Texto' },
+                'html': { icon: 'fa-file-code icon-code', type: 'Código Web' },
+                'css': { icon: 'fa-file-code icon-code', type: 'Código Web' },
+                'js': { icon: 'fa-file-code icon-code', type: 'Código Web' },
+                'php': { icon: 'fa-file-code icon-code', type: 'Código Web' }
+            };
+            return map[ext] || { icon: 'fa-file icon-default', type: 'Arquivo' };
+        }
 
-<script type="text/javascript">
-// Global variables
-var appname = "PrettyIndex of";
-var colors = shuffle(["red", "orange", "yellow", "green", "blue","indigo","purple"]);
-var bucket = colors.slice();
+        function formatSize(sizeStr) {
+            if (!sizeStr || sizeStr.trim() === '-' || sizeStr.trim() === '') return '';
+            return sizeStr.trim();
+        }
 
-// Shuffle array
-function shuffle(array) {
-  var currentIndex = array.length, temporaryValue, randomIndex;
+        // Gerar Breadcrumb
+        const pathParts = window.location.pathname.split('/').filter(p => p);
+        let currentPath = '/';
+        breadcrumbList.innerHTML = `<li class="breadcrumb-item"><a href="/"><i class="fa-solid fa-house"></i> Início</a></li>`;
+        pathParts.forEach((part, index) => {
+            currentPath += part + '/';
+            const isLast = index === pathParts.length - 1;
+            breadcrumbList.innerHTML += `
+                <li class="breadcrumb-item ${isLast ? 'active' : ''}" ${isLast ? 'aria-current="page"' : ''}>
+                    ${isLast ? decodeURIComponent(part) : `<a href="${currentPath}">${decodeURIComponent(part)}</a>`}
+                </li>`;
+        });
 
-  // While there remain elements to shuffle...
-  while (0 !== currentIndex) {
+        // Capturar links de ordenação da tabela original
+        const headers = table.querySelectorAll('th');
+        if (headers.length >= 4) {
+            const links = [
+                { id: 'sortName', index: 0 },
+                { id: 'sortDate', index: 1 },
+                { id: 'sortSize', index: 2 },
+                { id: 'sortDesc', index: 3 }
+            ];
+            links.forEach(link => {
+                const originalLink = headers[link.index]?.querySelector('a');
+                if (originalLink) {
+                    document.getElementById(link.id).href = originalLink.href;
+                    if (window.location.search.includes(originalLink.search)) {
+                        document.getElementById(link.id).classList.add('active');
+                        const icon = window.location.search.includes('O=A') ? 'fa-sort-up' : 'fa-sort-down';
+                        document.getElementById(link.id).innerHTML += ` <i class="fa-solid ${icon}"></i>`;
+                    }
+                }
+            });
+        }
 
-    // Pick a remaining element...
-    randomIndex = Math.floor(Math.random() * currentIndex);
-    currentIndex -= 1;
+        // Processar linhas da tabela
+        const rows = table.querySelectorAll('tr');
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            // No seu .htaccess, SuppressIcon está ativo, então as colunas são:
+            // 0: Name, 1: Last Modified, 2: Size, 3: Description
+            if (cells.length < 2) return; 
 
-    // And swap it with the current element.
-    temporaryValue = array[currentIndex];
-    array[currentIndex] = array[randomIndex];
-    array[randomIndex] = temporaryValue;
-  }
+            const linkElem = cells[0].querySelector('a');
+            if (!linkElem) return;
 
-  return array;
-}
+            const name = linkElem.innerText.trim();
+            if (name === "Parent Directory" || name === "Diretório Pai") return;
 
-// Random color
-function getRandomColor() {
-	if (bucket.length < 1) {
-		bucket = colors.slice();
-	}
-	
-	//var randomIndex = Math.floor(Math.random()*bucket.length);
-	var randomIndex = 0;
+            const href = linkElem.getAttribute('href');
+            const isDir = href.endsWith('/');
+            const date = cells[1] ? cells[1].innerText.trim() : '';
+            const size = cells[2] ? formatSize(cells[2].innerText) : '';
+            const desc = cells[3] ? cells[3].innerText.trim() : '';
+            
+            const info = getFileInfo(name, isDir);
 
-	return bucket.splice(randomIndex, 1)[0];
-}
+            const cardHtml = `
+                <div class="col-12 col-md-6 col-lg-4 col-xl-3">
+                    <a href="${href}" class="file-card">
+                        <div class="file-card-body">
+                            <div class="file-icon">
+                                <i class="fa-solid ${info.icon}"></i>
+                            </div>
+                            <div class="file-info">
+                                <span class="file-name" title="${name}">${name}</span>
+                                <div class="file-meta">
+                                    <span><i class="fa-regular fa-clock me-1"></i>${date}</span>
+                                    ${size ? `<span><i class="fa-solid fa-database me-1"></i>${size}</span>` : ''}
+                                </div>
+                                ${desc && desc !== '&nbsp;' ? `<div class="file-desc mt-1 text-muted small text-truncate">${desc}</div>` : ''}
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', cardHtml);
+        });
 
-// Convert date from "dd-mmm-yyyy hh:mm" to "dd/mm/yyyy hh:mm"
-function ConvertDate(str) {
-	try {
-		var arr = str.split("-");
-		var months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-		var month = months.indexOf(arr[1].toLowerCase());
-		var date = new Date(parseInt(arr[2]), month, parseInt(arr[0])).toLocaleString();
-		var pos = date.indexOf(" ");
-		date = date.substring(0, pos);
-	}
-	catch (e) {
-		var date = "&nbsp";
-	}
-	return date;
-}
-
-// Return Font Awesome icon name from extension
-function GetIcon(ext) {
-	var icon = "";
-	switch (ext) {
-	case "DIR":
-		icon = "fa-folder-open";
-		break;
-	case "zip":
-	case "7z":
-	case "bz2":
-	case "cab":
-	case "gz":
-	case "tar":
-		icon = "fa-file-archive-o";
-		break;
-	case "aac":
-	case "aif":
-	case "aifc":
-	case "aiff":
-	case "ape":
-	case "au":
-	case "flac":
-	case "iff":
-	case "m4a":
-	case "mid":
-	case "mp3":
-	case "mpa":
-	case "ra":
-	case "wav":
-	case "wma":
-	case "f4a":
-	case "f4b":
-	case "oga":
-	case "ogg":
-	case "xm":
-	case "it":
-	case "s3m":
-	case "mod":
-		icon = "fa-file-audio-o";
-		break;
-	case "php":
-	case "htm":
-	case "html":
-	case "css":
-	case "js":
-	case "java":
-	case "jar":
-		icon = "fa-file-code-o";
-		break;
-	case "xls":
-	case "xlsx":
-	case "csv":
-	case "tsv":
-	case "xlsm":
-	case "xltx":
-	case "xltm":
-	case "xlam":
-	case "xlr":
-		icon = "fa-file-excel-o";
-		break;
-	case "gif":
-	case "png":
-	case "bmp":
-	case "jpg":
-	case "jpeg":
-	case "ico":
-	case "jpe":
-	case "psd":
-	case "xcf":
-		icon = "fa-file-image-o";
-		break;
-	case "pdf":
-	case "tif":
-	case "tiff":
-		icon = "fa-file-pdf-o";
-		break;
-	case "ppt":
-	case "pptx":
-	case "pptm":
-	case "ppsx":
-	case "pps":
-	case "ppsm":
-	case "potx":
-	case "pot":
-	case "potm":
-	case "odp":
-		icon = "fa-file-powerpoint-o";
-		break;
-	case "txt":
-		icon = "fa-file-text";
-		break;
-	case "asf":
-	case "asx":
-	case "avi":
-	case "flv":
-	case "mkv":
-	case "mov":
-	case "mp4":
-	case "mpg":
-	case "rm":
-	case "srt":
-	case "swf":
-	case "vob":
-	case "wmv":
-	case "m4v":
-	case "f4v":
-	case "f4p":
-	case "ogv":
-		icon = "fa-file-video-o";
-		break;
-	case "doc":
-	case "docx":
-		icon = "fa-file-word-o";
-		break;
-	default:
-		icon = "fa-file";
-	}
-	return icon;
-}
-
-$(document).ready(function() {
-	document.getElementsByTagName('title')[0].prepend("Pretty");
-	// Print the title
-	var title = document.getElementsByTagName('title')[0].innerHTML;
-	//var n = title.lastIndexOf('/');
-	//title = title.substring(title.lastIndexOf('/') + 1);
-	/*if (title.length > 30) {
-		title = title.substring(0,25) + "...";
-	}*/
-	//title += "/";
-	document.getElementById("title").innerHTML = title;
-	//document.getElementsByTagName('title')[0].prepend("Pretty");
-	
-	// Replace table with tile
-	$('table').replaceWith(function () {
-		var html = "";
-		var ext = "";
-		var ahref = "";
-		var date = "";
-		var name = "";
-		var size = "";
-		var desc = "";
-		var hint = "";
-		var icon = "";
-		// Navbar
-		$("tr:has(th)", this).each(function () {
-			// Update links
-			$("#sortName").attr("href", $(this).children('th').eq(0).children('a').attr("href"));
-			$("#sortDate").attr("href", $(this).children('th').eq(1).children('a').attr("href"));
-			$("#sortSize").attr("href", $(this).children('th').eq(2).children('a').attr("href"));
-			$("#sortDesc").attr("href", $(this).children('th').eq(3).children('a').attr("href"));
-			
-			
-			// Add sort icons to active sort
-			var urlparam = new (function (sRecherche) {
-				if (sRecherche.length > 1) {
-					for (var aItKey, nKeyId = 0, aCouples = sRecherche.substr(1).split(";"); nKeyId < aCouples.length; nKeyId++) {
-						aItKey = aCouples[nKeyId].split("=");
-						this[unescape(aItKey[0])] = aItKey.length > 1 ? unescape(aItKey[1]) : "";
-					}
-				}
-			})(window.location.search);
-			switch (urlparam.C) {
-				case "M":
-					$("#sortDate").parent("li").addClass("active");
-					if (urlparam.O == 'A') {
-						$("#sortDate").prepend("<span class='glyphicon glyphicon-chevron-down'></span>&nbsp;");
-					} else {
-						$("#sortDate").prepend("<span class='glyphicon glyphicon-chevron-up'></span>&nbsp;");
-					}
-					break;
-				case "S":
-					$("#sortSize").parent("li").addClass("active");
-					if (urlparam.O == 'A') {
-						$("#sortSize").prepend("<span class='glyphicon glyphicon-chevron-down'></span>&nbsp;");
-					} else {
-						$("#sortSize").prepend("<span class='glyphicon glyphicon-chevron-up'></span>&nbsp;");
-					}
-					break;
-				case "D":
-					$("#sortDesc").parent("li").addClass("active");
-					if (urlparam.O == 'A') {
-						$("#sortDesc").prepend("<span class='glyphicon glyphicon-chevron-down'></span>&nbsp;");
-					} else {
-						$("#sortDesc").prepend("<span class='glyphicon glyphicon-chevron-up'></span>&nbsp;");
-					}
-					break;
-				default:
-					$("#sortName").parent("li").addClass("active");
-					if (urlparam.O == 'A') {
-						$("#sortName").prepend("<span class='glyphicon glyphicon-chevron-down'></span>&nbsp;");
-					} else {
-						$("#sortName").prepend("<span class='glyphicon glyphicon-chevron-up'></span>&nbsp;");
-					}
-			}
-		});
-		
-		// Tiles
-		$("tr:has(td)", this).each(function () {
-			ahref = $(this).children('td').eq(0).children('a').attr("href");
-			name = $(this).children('td').eq(0).children('a').html();
-			size = $(this).children('td').eq(2).html().replace(/\s+$/, '');
-			hint = name;
-			if (desc !== "&nbsp;") {
-				hint += " - " + desc.replace('\'', '&#39;');
-			}
-			if (name.indexOf('.') !== -1) {
-				ext = /(?:\.([^.]+))?$/.exec(name)[1].toLowerCase();
-			} else {
-				 if ((name.substr(name.length-1) == "/mkmsg/") || (name == "Voltar")) {
-					ext = "DIR";
-				 } else {
-					ext = "Nada";
-				 }
-			}
-			
-			html += "<div class='col-sm-3'><a href='"+ahref+"' title='"+hint+"'><div class='tile "+getRandomColor()+"'>";
-			html += "<h3 class='title'><i class='fa "+GetIcon(ext)+"'></i>&nbsp;"+name+"</h3>";
-			html += "<span class='desc pull-left'>"+desc+"</span>";
-			html += "<span class='datesize pull-right'>";
-			if (size !== "  -") {
-				html += size+"o - ";
-			}
-			html += date+"</span>";
-
-			html += "</div></a></div>";
-		});
-		return "<div class='row'>" + html + "</div>";
-	});
-
-
-});
-</script>
+        // Atualizar título da página
+        const pageTitle = document.querySelector('h1')?.innerText || "Arquivos";
+        document.getElementById('title').querySelector('span').innerText = pageTitle.replace('Index of ', 'Pasta: ');
+    });
+    </script>
+</body>
+</html>

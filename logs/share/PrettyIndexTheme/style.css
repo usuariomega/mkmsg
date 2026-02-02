@@ -1,139 +1,116 @@
-@import url("//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css");
-@import url('//fonts.googleapis.com/css?family=Open+Sans');
-@import url('//maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css');
+:root {
+    --primary-color: #0d6efd;
+    --bg-light: #f8f9fa;
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --card-hover-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
 
 body {
-  font-family: "Open Sans", "Segoe UI", Frutiger, "Frutiger Linotype", "Dejavu Sans", "Helvetica Neue", Arial, sans-serif;
-  font-size: 14px;
-  line-height: 1.5em;
-  font-weight: 400;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-light);
+    color: #334155;
+    padding-top: 80px;
 }
 
-p, span, a, ul, li, button {
-  font-family: inherit;
-  font-size: inherit;
-  font-weight: inherit;
-  line-height: inherit;
+.main-content {
+    padding: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
 }
 
-strong {
-  font-weight: 600;
+.navbar-brand {
+    font-weight: 600;
+    letter-spacing: -0.5px;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: "Open Sans", "Segoe UI", Frutiger, "Frutiger Linotype", "Dejavu Sans", "Helvetica Neue", Arial, sans-serif;
-  line-height: 1.5em;
-  font-weight: 300;
+.breadcrumb {
+    margin-bottom: 2rem;
 }
 
-strong {
-  font-weight: 400;
+.file-card {
+    background: white;
+    border-radius: 12px;
+    border: none;
+    box-shadow: var(--card-shadow);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    height: 100%;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
 }
 
-.tile {
-  width: 100%;
-  display: inline-block;
-  box-sizing: border-box;
-  background: #fff;
-  padding: 20px;
-  margin-bottom: 30px;
-  transition:all 0.2s ease;
-  opacity: 0.8;
+.file-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--card-hover-shadow);
+    color: inherit;
 }
 
-.tile .title {
-  margin-top: 0px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
+.file-card-body {
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
 }
 
-.tile .desc {
-    overflow:hidden;
-    white-space:nowrap;
-    text-overflow:ellipsis;
-    width:100%;
-    display:block;
+.file-icon {
+    font-size: 2.5rem;
+    margin-right: 1.25rem;
+    width: 50px;
+    text-align: center;
+    flex-shrink: 0;
 }
 
-.tile .datesize {
-  font-size: 10px;
-  opacity: 0.75;
+.file-info {
+    flex-grow: 1;
+    min-width: 0;
 }
 
-.tile:hover {
-  -webkit-transform: scale(1.125);
-  -ms-transform: scale(1.125);
-  transform: scale(1.125);
-  z-index: 2;
+.file-name {
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
 }
 
-.tile.red, .tile.orange, .tile.yellow, .tile.green, .tile.blue, .tile.indigo, .tile.purple {
-  color: #fff;
-}
-.tile.red {
-  background: #AC193D;
-}
-.tile.red:hover {
-  background: #7f132d;
-}
-.tile.orange {
-  background: #DC572E;
-}
-.tile.orange:hover {
-  background: #b8431f;
-}
-.tile.yellow {
-  background: #e3a21a;
-}
-.tile.yellow:hover {
-  background: #b58115;
-}
-.tile.green {
-  background: #00A600;
-}
-.tile.green:hover {
-  background: #007300;
-}
-.tile.blue {
-  background: #2672EC;
-}
-.tile.blue:hover {
-  background: #125acd;
-}
-.tile.indigo {
-  background: #172588;
-} 
-.tile.indigo:hover {
-  background: #131d66;
-}
-.tile.purple {
-  background: #5133AB;
-}
-.tile.purple:hover {
-  background: #3e2784;
+.file-meta {
+    font-size: 0.85rem;
+    color: #64748b;
+    display: flex;
+    gap: 10px;
 }
 
-@media (max-width: 767px) {
-	.navbar-header {
-		width:100%;
-	}
-	.navbar-brand {
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		overflow: hidden;
-		width:70%;
-	}
+.file-desc {
+    font-size: 0.75rem;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 4px;
+    margin-top: 4px;
 }
 
-@media (min-width: 768px) {
-	.navbar-header {
-		width:48%;
-	}
-	.navbar-brand {
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		overflow: hidden;
-		width:100%;
-	}
+/* Cores por tipo de arquivo */
+.icon-folder { color: #f59e0b; }
+.icon-image { color: #ec4899; }
+.icon-video { color: #ef4444; }
+.icon-audio { color: #8b5cf6; }
+.icon-archive { color: #6366f1; }
+.icon-code { color: #10b981; }
+.icon-pdf { color: #dc2626; }
+.icon-excel { color: #16a34a; }
+.icon-word { color: #2563eb; }
+.icon-powerpoint { color: #ea580c; }
+.icon-text { color: #64748b; }
+.icon-default { color: #94a3b8; }
+
+/* Ajustes para a tabela original do Apache (que será escondida) */
+table {
+    display: none !important;
+}
+
+@media (max-width: 768px) {
+    .file-icon {
+        font-size: 2rem;
+        margin-right: 1rem;
+    }
 }
