@@ -44,7 +44,7 @@ Gerencie a conexão com a API do WhatsApp e configure os parâmetros globais de 
 
 #### Configurações Gerais
 *Ajuste os tempos de pausa entre envios, os dias específicos para disparo de cada tipo de mensagem e os horários de execução do *daemon*.*
-<img width="1585" height="2398" alt="confgeral" src="https://github.com/user-attachments/assets/ddc34b62-faae-4a70-9b92-a336916cad76" /><br><br>
+<img width="1588" height="2837" alt="confgeral" src="https://github.com/user-attachments/assets/615e39f7-d802-40e7-b321-2f15cf813332" /><br><br>
 
 
 
