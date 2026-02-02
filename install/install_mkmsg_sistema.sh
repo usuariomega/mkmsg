@@ -234,30 +234,34 @@ if [ -z "$API_TOKEN" ]; then
 fi
 
 #Se ainda não tem token, perguntar ao usuário
-if [ -z "$API_TOKEN" ]; then
-    echo ""
-    echo "Token não encontrado. Escolha uma opção:"
-    echo ""
-    echo "  1) Gerar um novo token aleatório (20 caracteres)"
-    echo "  2) Digitar um token customizado"
-    echo ""
-    
-    read -p "Digite sua escolha (1 ou 2): " TOKEN_CHOICE
-    
-    if [ "$TOKEN_CHOICE" = "1" ]; then
-        log "🔑 Gerando novo token..."
-        API_TOKEN=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 20)
-        log "✅ Token gerado: $API_TOKEN"
-    elif [ "$TOKEN_CHOICE" = "2" ]; then
-        read -p "Digite o token (20 caracteres recomendado): " API_TOKEN
-        if [ -z "$API_TOKEN" ]; then
-            error "Token não pode estar vazio."
+while true; do
+    if [ -z "$API_TOKEN" ]; then
+        echo ""
+        echo "Token não encontrado. Escolha uma opção:"
+        echo ""
+        echo "  1) Gerar um novo token aleatório (20 caracteres)"
+        echo "  2) Digitar um token customizado"
+        echo ""
+        
+        read -p "Digite sua escolha (1 ou 2): " TOKEN_CHOICE
+        
+        if [ "$TOKEN_CHOICE" = "1" ]; then
+            log "🔑 Gerando novo token..."
+            API_TOKEN=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 20)
+            log "✅ Token gerado: $API_TOKEN"
+            break
+        elif [ "$TOKEN_CHOICE" = "2" ]; then
+            read -p "Digite o token (20 caracteres recomendado): " API_TOKEN
+            if [ -z "$API_TOKEN" ]; then
+                error "Token não pode estar vazio."
+            fi
+            log "✅ Token fornecido: $API_TOKEN"
+            break
+        else
+            warn "❌ Opção inválida. Por favor, escolha 1 ou 2."
         fi
-        log "✅ Token fornecido: $API_TOKEN"
-    else
-        error "Opção inválida."
     fi
-fi
+done
 
 echo ""
 log "🔐 Token: $API_TOKEN"
