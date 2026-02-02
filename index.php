@@ -32,14 +32,12 @@ if (isset($_POST['ajax_send']) || isset($_POST['get_all_ids'])) {
         $error = curl_error($ch);
         curl_close($ch);
 
-        // Validação da resposta da API
         $apiSuccess = false;
         if (!$error) {
             $resData = json_decode($response, true);
-            // Verifica se a API retornou status de sucesso (ajuste conforme o retorno real da sua API)
             if (isset($resData['status']) && ($resData['status'] === 'sent' || $resData['status'] === true)) {
                 $apiSuccess = true;
-            } elseif (isset($resData['key'])) { // Algumas APIs retornam um objeto 'key' em caso de sucesso
+            } elseif (isset($resData['key'])) {
                 $apiSuccess = true;
             }
         }
@@ -47,7 +45,13 @@ if (isset($_POST['ajax_send']) || isset($_POST['get_all_ids'])) {
         $month = date("Y-m");
         $root = $_SERVER["DOCUMENT_ROOT"] . "/mkmsg";
         $dir = "$root/logs/$month/noprazo";
-        if (!is_dir($dir)) { mkdir($dir, 0755, true); }
+
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+            if (file_exists("$root/logs/.ler/modelo/index.php")) {
+                copy("$root/logs/.ler/modelo/index.php", "$dir/index.php");
+            }
+        }
 
         $logFile = "$dir/noprazo_" . date("d-M-Y") . ".log";
         $logData = sprintf("%s;%s;%s;%s\n", date("d-m-Y"), date("H:i:s"), $nome, $error ?: $response);
@@ -85,7 +89,6 @@ include 'header.php';
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-// Configurações de Filtro e Ordenação
 $search = isset($_GET['search']) ? $_GET['search'] : '';
 $order_by = isset($_GET['order_by']) ? $_GET['order_by'] : 'nome_res';
 $order_dir = isset($_GET['order_dir']) && $_GET['order_dir'] == 'desc' ? 'desc' : 'asc';
@@ -93,7 +96,6 @@ $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $offset = ($page - 1) * $limit;
 
-// Conexão e Busca de Dados
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) { die("Erro de conexão: " . $conn->connect_error); }
 
@@ -232,7 +234,6 @@ while ($row = $result->fetch_assoc()) {
     </form>
 </div>
 
-<!-- Overlay de Processamento -->
 <div id="overlay" class="overlay" style="display: none;">
     <div class="card" style="max-width: 500px; width: 90%;">
         <h3 id="overlay-title">📤 Processando Envios...</h3>
@@ -290,7 +291,6 @@ async function processarEnvios(lista) {
             $('#overlay-content').append(`<br><span style="color:red;">Erro de conexão ao enviar para ${nomeErro}</span>`);
         }
 
-        // Delay entre envios
         const tempomin = <?= (int)$tempomin ?>;
         const tempomax = <?= (int)$tempomax ?>;
         if (tempomax > 0) {
