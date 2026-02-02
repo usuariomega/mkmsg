@@ -33,7 +33,6 @@ if (isset($_POST['ajax_send']) || isset($_POST['get_all_ids'])) {
         $error = curl_error($ch);
         curl_close($ch);
 
-        // Validação da resposta da API
         $apiSuccess = false;
         if (!$error) {
             $resData = json_decode($response, true);
@@ -47,7 +46,13 @@ if (isset($_POST['ajax_send']) || isset($_POST['get_all_ids'])) {
         $month = date("Y-m");
         $root = $_SERVER["DOCUMENT_ROOT"] . "/mkmsg";
         $dir = "$root/logs/$month/pago";
-        if (!is_dir($dir)) { mkdir($dir, 0755, true); }
+
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+            if (file_exists("$root/logs/.ler/modelo/index.php")) {
+                copy("$root/logs/.ler/modelo/index.php", "$dir/index.php");
+            }
+        }
 
         $logFile = "$dir/pago_" . date("d-M-Y") . ".log";
         $logData = sprintf("%s;%s;%s;%s\n", date("d-m-Y"), date("H:i:s"), $nome, $error ?: $response);
@@ -86,7 +91,6 @@ include 'header.php';
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-// Configurações de Filtro e Ordenação
 $mesAtual = date("m-Y");
 $valorsel = isset($_GET['menumes']) ? $_GET['menumes'] : $mesAtual;
 $search = isset($_GET['search']) ? $_GET['search'] : '';
@@ -96,7 +100,6 @@ $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $offset = ($page - 1) * $limit;
 
-// Conexão e Busca de Dados
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) { die("Erro de conexão: " . $conn->connect_error); }
 
@@ -250,7 +253,6 @@ while ($row = $result->fetch_assoc()) {
     </form>
 </div>
 
-<!-- Overlay de Processamento -->
 <div id="overlay" class="overlay" style="display: none;">
     <div class="card" style="max-width: 500px; width: 90%;">
         <h3 id="overlay-title">📤 Processando Envios...</h3>
@@ -334,7 +336,14 @@ $(document).ready(function() {
         const id = row.data('id');
         const currentSelected = getSelected();
         if (this.checked) {
-            currentSelected[id] = { nome_res: row.data('nome'), celular: row.data('celular'), datavenc: row.data('venc'), datapag: row.data('pag'), linhadig: row.data('linha'), qrcode: row.data('qr') };
+            currentSelected[id] = { 
+                nome_res: row.data('nome'), 
+                celular: row.data('celular'), 
+                datavenc: row.data('venc'), 
+                datapag: row.data('pag'), 
+                linhadig: row.data('linha'), 
+                qrcode: row.data('qr') 
+            };
         } else { delete currentSelected[id]; }
         saveSelected(currentSelected);
     });
