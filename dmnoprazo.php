@@ -17,6 +17,7 @@ foreach ($diasnoprazo as $dias) {
             INNER JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo
             WHERE DATEDIFF(vtab_titulos.datavenc, CURRENT_DATE()) = $dias
             AND vtab_titulos.status = 'aberto' AND vtab_titulos.cli_ativado = 's'
+            AND (vtab_titulos.deltitulo = 0 OR vtab_titulos.deltitulo IS NULL)
             AND TRIM(IFNULL(vtab_titulos.linhadig, '')) <> '' AND TRIM(IFNULL(sis_qrpix.qrcode, '')) <> ''
             GROUP BY vtab_titulos.uuid_lanc ORDER BY nome_res ASC";
     

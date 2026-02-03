@@ -64,6 +64,7 @@ if (isset($_POST['ajax_send']) || isset($_POST['get_all_ids'])) {
                       INNER JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo 
                       WHERE vtab_titulos.status = 'aberto' AND vtab_titulos.cli_ativado = 's' 
                       AND MONTH(vtab_titulos.datavenc) = MONTH(CURDATE()) AND YEAR(vtab_titulos.datavenc) = YEAR(CURDATE())
+                      AND (vtab_titulos.deltitulo = 0 OR vtab_titulos.deltitulo IS NULL)
                       AND TRIM(IFNULL(vtab_titulos.linhadig, '')) <> '' AND TRIM(IFNULL(sis_qrpix.qrcode, '')) <> ''
                       GROUP BY vtab_titulos.uuid_lanc ORDER BY nome_res ASC";
         $res_todos = $conn->query($sql_todos);
@@ -92,6 +93,7 @@ if ($conn->connect_error) die("Erro de conexão: " . $conn->connect_error);
 
 $where_clause = "WHERE vtab_titulos.status = 'aberto' AND vtab_titulos.cli_ativado = 's' 
                  AND MONTH(vtab_titulos.datavenc) = MONTH(CURDATE()) AND YEAR(vtab_titulos.datavenc) = YEAR(CURDATE())
+                 AND (vtab_titulos.deltitulo = 0 OR vtab_titulos.deltitulo IS NULL)
                  AND TRIM(IFNULL(vtab_titulos.linhadig, '')) <> '' AND TRIM(IFNULL(sis_qrpix.qrcode, '')) <> ''";
 
 if (!empty($search)) $where_clause .= " AND (vtab_titulos.nome_res LIKE ? OR vtab_titulos.celular LIKE ?)";

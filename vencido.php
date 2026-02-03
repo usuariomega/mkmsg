@@ -64,6 +64,7 @@ if (isset($_POST['ajax_send']) || isset($_POST['get_all_ids'])) {
                       FROM vtab_titulos 
                       INNER JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo 
                       WHERE DATE_FORMAT(datavenc,'%m-%Y') = ? AND vtab_titulos.status = 'vencido' AND vtab_titulos.cli_ativado = 's'
+                      AND (vtab_titulos.deltitulo = 0 OR vtab_titulos.deltitulo IS NULL)
                       AND TRIM(IFNULL(vtab_titulos.linhadig, '')) <> '' AND TRIM(IFNULL(sis_qrpix.qrcode, '')) <> ''
                       GROUP BY vtab_titulos.uuid_lanc ORDER BY nome_res ASC";
         $stmt_todos = $conn->prepare($sql_todos);
@@ -95,7 +96,9 @@ $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) die("Erro de conexão: " . $conn->connect_error);
 
 $where_clause = "WHERE DATE_FORMAT(datavenc,'%m-%Y') = ? AND vtab_titulos.status = 'vencido' AND vtab_titulos.cli_ativado = 's'
+                 AND (vtab_titulos.deltitulo = 0 OR vtab_titulos.deltitulo IS NULL)
                  AND TRIM(IFNULL(vtab_titulos.linhadig, '')) <> '' AND TRIM(IFNULL(sis_qrpix.qrcode, '')) <> ''";
+
 if (!empty($search)) $where_clause .= " AND (vtab_titulos.nome_res LIKE ? OR vtab_titulos.celular LIKE ?)";
 
 $count_sql = "SELECT COUNT(DISTINCT vtab_titulos.uuid_lanc) as total FROM vtab_titulos 
