@@ -60,15 +60,19 @@ if (isset($_POST['ajax_send']) || isset($_POST['get_all_ids'])) {
     if (isset($_POST['get_all_ids'])) {
         $conn = new mysqli($servername, $username, $password, $dbname);
         $valorsel = $_GET['menumes'];
-        $sql_todos = "SELECT upper(vtab_titulos.nome_res) as nome_res, REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS celular, 
+        $sql_todos = "SELECT upper(vtab_titulos.nome_res) as nome_res, 
+                      REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS celular, 
                       DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS datavenc, DATE_FORMAT(vtab_titulos.datapag,'%d/%m/%y') AS datapag, 
                       vtab_titulos.linhadig, sis_qrpix.qrcode 
                       FROM vtab_titulos 
-                      INNER JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo 
+                      LEFT JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo 
                       WHERE DATE_FORMAT(datapag,'%m-%Y') = ? AND vtab_titulos.status = 'pago' AND vtab_titulos.cli_ativado = 's'
                       AND (vtab_titulos.deltitulo = 0 OR vtab_titulos.deltitulo IS NULL)
-                      AND TRIM(IFNULL(vtab_titulos.linhadig, '')) <> '' AND TRIM(IFNULL(sis_qrpix.qrcode, '')) <> ''
+                      AND vtab_titulos.nome_res IS NOT NULL AND TRIM(vtab_titulos.nome_res) <> ''
+                      AND vtab_titulos.celular IS NOT NULL AND TRIM(vtab_titulos.celular) <> ''
+                      AND vtab_titulos.linhadig IS NOT NULL AND TRIM(vtab_titulos.linhadig) <> ''
                       GROUP BY vtab_titulos.uuid_lanc ORDER BY nome_res ASC";
+    
         $stmt_todos = $conn->prepare($sql_todos);
         $stmt_todos->bind_param("s", $valorsel);
         $stmt_todos->execute();
@@ -99,12 +103,15 @@ if ($conn->connect_error) die("Erro de conexão: " . $conn->connect_error);
 
 $where_clause = "WHERE DATE_FORMAT(datapag,'%m-%Y') = ? AND vtab_titulos.status = 'pago' AND vtab_titulos.cli_ativado = 's'
                  AND (vtab_titulos.deltitulo = 0 OR vtab_titulos.deltitulo IS NULL)
-                 AND TRIM(IFNULL(vtab_titulos.linhadig, '')) <> '' AND TRIM(IFNULL(sis_qrpix.qrcode, '')) <> ''";
+                 AND vtab_titulos.nome_res IS NOT NULL AND TRIM(vtab_titulos.nome_res) <> ''
+                 AND vtab_titulos.celular IS NOT NULL AND TRIM(vtab_titulos.celular) <> ''
+                 AND vtab_titulos.linhadig IS NOT NULL AND TRIM(vtab_titulos.linhadig) <> ''";
 
 if (!empty($search)) $where_clause .= " AND (vtab_titulos.nome_res LIKE ? OR vtab_titulos.celular LIKE ?)";
 
 $count_sql = "SELECT COUNT(DISTINCT vtab_titulos.uuid_lanc) as total FROM vtab_titulos 
-              INNER JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo $where_clause";
+              LEFT JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo $where_clause";
+
 $stmt_count = $conn->prepare($count_sql);
 if (!empty($search)) {
     $search_param = "%$search%";
@@ -120,9 +127,9 @@ $sql = "SELECT vtab_titulos.uuid_lanc, upper(vtab_titulos.nome_res) as nome_res,
         DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS datavenc, DATE_FORMAT(vtab_titulos.datapag,'%d/%m/%y') AS datapag, 
         vtab_titulos.linhadig, sis_qrpix.qrcode 
         FROM vtab_titulos 
-        INNER JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo 
+        LEFT JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo 
         $where_clause GROUP BY vtab_titulos.uuid_lanc
-        ORDER BY $order_by $order_dir, vtab_titulos.uuid_lanc ASC LIMIT ? OFFSET ?";
+        ORDER BY $order_by $order_dir LIMIT ? OFFSET ?";
 
 $stmt = $conn->prepare($sql);
 if (!empty($search)) {
@@ -148,6 +155,7 @@ $result = $stmt->get_result();
             <button class="button3" onclick="location.href='index.php'" type="button">📅 No prazo</button>
             <button class="button3" onclick="location.href='vencido.php'" type="button">⚠️ Vencidos</button>
             <button class="button2" onclick="location.href='pago.php'" type="button" style="background-color: var(--success); border: 2px solid var(--success);">✅ Pagos</button>
+            <button class="button3" onclick="location.href='emmassa.php'" type="button">📢 Em massa</button>
             <button class="button3" onclick="location.href='confmsg.php'" type="button">💬 Conf. msg</button>
             <button class="button3" onclick="location.href='confweb.php'" type="button">⚙️ Conf. geral</button>
         </div>

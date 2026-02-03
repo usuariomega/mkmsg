@@ -14,11 +14,13 @@ foreach ($diaspago as $dias) {
     $sql = "SELECT upper(vtab_titulos.nome_res) as nome_res, REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS celular,
             DATE_FORMAT(vtab_titulos.datapag,'%d/%m/%y') AS datapag, vtab_titulos.linhadig, sis_qrpix.qrcode
             FROM vtab_titulos
-            INNER JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo
+            LEFT JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo
             WHERE DATEDIFF(CURRENT_DATE(), vtab_titulos.datapag) = $dias
             AND vtab_titulos.status = 'pago' AND vtab_titulos.cli_ativado = 's'
             AND (vtab_titulos.deltitulo = 0 OR vtab_titulos.deltitulo IS NULL)
-            AND TRIM(IFNULL(vtab_titulos.linhadig, '')) <> '' AND TRIM(IFNULL(sis_qrpix.qrcode, '')) <> ''
+            AND vtab_titulos.nome_res IS NOT NULL AND TRIM(vtab_titulos.nome_res) <> ''
+            AND vtab_titulos.celular IS NOT NULL AND TRIM(vtab_titulos.celular) <> ''
+            AND vtab_titulos.linhadig IS NOT NULL AND TRIM(vtab_titulos.linhadig) <> ''"
             GROUP BY vtab_titulos.uuid_lanc ORDER BY nome_res ASC";
     
     $result = $conn->query($sql);

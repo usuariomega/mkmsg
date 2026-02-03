@@ -112,21 +112,12 @@ $config = readConfig($configFile);
     <!-- Menu de Navegação -->
     <div class="menu card mb-3">
         <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-            <button class="button3" onclick="location.href='index.php'" type="button">
-                📅 No prazo
-            </button>
-            <button class="button3" onclick="location.href='vencido.php'" type="button">
-                ⚠️ Vencidos
-            </button>
-            <button class="button3" onclick="location.href='pago.php'" type="button">
-                ✅ Pagos
-            </button>
-            <button class="button3" onclick="location.href='confmsg.php'" type="button">
-                💬 Conf. msg
-            </button>
-            <button class="button2" onclick="location.href='confweb.php'" type="button" style="background-color: var(--tertiary); border: 2px solid var(--tertiary);">
-                ⚙️ Conf. geral
-            </button>
+            <button class="button3" onclick="location.href='index.php'" type="button">📅 No prazo</button>
+            <button class="button3" onclick="location.href='vencido.php'" type="button">⚠️ Vencidos</button>
+            <button class="button3" onclick="location.href='pago.php'" type="button">✅ Pagos</button>
+            <button class="button3" onclick="location.href='emmassa.php'" type="button">📢 Em massa</button>
+            <button class="button3" onclick="location.href='confmsg.php'" type="button">💬 Conf. msg</button>
+            <button class="button2" onclick="location.href='confweb.php'" type="button" style="background-color: var(--secondary); border: 2px solid var(--secondary);">⚙️ Conf. geral</button>
         </div>
     </div>
 
