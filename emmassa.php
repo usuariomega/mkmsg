@@ -73,7 +73,7 @@ function listFiles($dir) {
 
 // Processar requisições AJAX ANTES de qualquer saída (header.php)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    // Carregar config.php para ter acesso às variáveis de banco e API
+    // Carregar config.php para ter acesso às variáveis de banco, API, provedor e site
     include 'config.php';
     
     $action = $_POST['action'];
@@ -85,28 +85,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $nome = $contato['nome'] ?? 'N/A';
         $celular = $contato['celular'] ?? '';
         $firstName = explode(' ', $nome)[0];
-        $msgFinal = str_replace(['%cliente%', '%nome%', '%celular%', '%0A', '##'], [$nome, $firstName, $celular, "\n", ''], $message);
         
-        $payload = ["numero" => "55" . $celular, "mensagem" => $msgFinal];
-        $ch = curl_init("http://$wsip:8000/send");
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => ["Content-Type: application/json", "x-api-token: $token"],
-            CURLOPT_TIMEOUT => 10
-        ]);
-        $response = curl_exec($ch);
-        $error = curl_error($ch);
-        curl_close($ch);
+        // CORREÇÃO: Dividir a mensagem por ## para enviar múltiplos balões
+        $baloes = explode('##', $message);
+        $responses = [];
+        $allSuccess = true;
+        $lastError = '';
 
-        $apiSuccess = false;
-        if (!$error) {
-            $resData = json_decode($response, true);
-            $apiSuccess = (isset($resData['status']) && ($resData['status'] === 'sent' || $resData['status'] === true)) || isset($resData['key']);
+        foreach ($baloes as $balao) {
+            $balao = trim($balao);
+            if (empty($balao)) continue;
+
+            // Substituição de variáveis por balão
+            $msgFinal = str_replace(
+                ['%cliente%', '%nome%', '%celular%', '%provedor%', '%site%', '%0A'], 
+                [$nome, $firstName, $celular, $provedor ?? '', $site ?? '', "\n"], 
+                $balao
+            );
+            
+            $payload = ["numero" => "55" . $celular, "mensagem" => $msgFinal];
+            $ch = curl_init("http://$wsip:8000/send");
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_HTTPHEADER => ["Content-Type: application/json", "x-api-token: $token"],
+                CURLOPT_TIMEOUT => 10
+            ]);
+            $response = curl_exec($ch);
+            $error = curl_error($ch);
+            curl_close($ch);
+
+            $apiSuccess = false;
+            if (!$error) {
+                $resData = json_decode($response, true);
+                $apiSuccess = (isset($resData['status']) && ($resData['status'] === 'sent' || $resData['status'] === true)) || isset($resData['key']);
+            }
+
+            if (!$apiSuccess) {
+                $allSuccess = false;
+                $lastError = $error ?: $response;
+            }
+            
+            $responses[] = $error ?: $response;
+            
+            // Pequena pausa entre balões para evitar problemas na API
+            usleep(500000); // 0.5 segundos
         }
         
-        // Log
+        // Log (apenas o resultado final)
         $month = date("Y-m");
         $root = $_SERVER["DOCUMENT_ROOT"] . "/mkmsg";
         $dir = "$root/logs/$month/emmassa";
@@ -115,9 +142,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if (file_exists("$root/logs/.ler/modelo/index.php")) copy("$root/logs/.ler/modelo/index.php", "$dir/index.php");
         }
         $logFile = "$dir/emmassa_" . date("d-M-Y") . ".log";
-        file_put_contents($logFile, sprintf("%s;%s;%s;%s\n", date("d-m-Y"), date("H:i:s"), $nome, $error ?: $response), FILE_APPEND);
+        file_put_contents($logFile, sprintf("%s;%s;%s;%s\n", date("d-m-Y"), date("H:i:s"), $nome, $allSuccess ? "Sucesso (Múltiplos Balões)" : "Falha: " . $lastError), FILE_APPEND);
         
-        echo json_encode(['success' => $apiSuccess, 'nome' => $nome, 'response' => $error ?: $response]);
+        echo json_encode(['success' => $allSuccess, 'nome' => $nome, 'response' => implode(' | ', $responses)]);
         exit;
     }
     
@@ -327,6 +354,10 @@ let allClients = <?php echo json_encode($clients); ?>;
 let selectedClients = [];
 let isStopped = false;
 
+// Passando as variáveis do PHP para o JavaScript para a pré-visualização
+const PROVEDOR_NOME = "<?php echo $provedor ?? 'PROVEDOR'; ?>";
+const PROVEDOR_SITE = "<?php echo $site ?? 'www.site.com.br'; ?>";
+
 // Tempos de pausa vindos do config.php (convertidos para milissegundos)
 const TEMPO_MIN = <?php echo $tMin * 1000; ?>;
 const TEMPO_MAX = <?php echo $tMax * 1000; ?>;
@@ -347,7 +378,12 @@ $(document).ready(function() {
 function updatePreview() {
     const input = $('#messageContent').val();
     const previewContainer = $('#preview');
-    const mockData = { '%cliente%': '<b>João da Silva Xavier</b>', '%nome%': '<b>João</b>', '%provedor%': '<b>PROVEDOR EXEMPLO</b>', '%site%': '<b>www.exemplo.com.br</b>' };
+    const mockData = { 
+        '%cliente%': '<b>João da Silva Xavier</b>', 
+        '%nome%': '<b>João</b>', 
+        '%provedor%': `<b>${PROVEDOR_NOME}</b>`, 
+        '%site%': `<b>${PROVEDOR_SITE}</b>` 
+    };
     previewContainer.empty();
     if (!input.trim()) { previewContainer.html('<span style="color: #999;">Sua pré-visualização aparecerá aqui...</span>'); return; }
     input.split('##').forEach(text => {
@@ -418,7 +454,6 @@ function loadList(filename) {
 function openSaveMessageModal() { if (!$('#messageContent').val()) return alert('Digite uma mensagem'); $('#saveMessageModal').addClass('active'); }
 function saveCurrentMessage() {
     const name = $('#newMessageName').val();
-    if (!name) return alert('Digite um nome');
     $.post('', { action: 'saveMessage', name, content: $('#messageContent').val() }, function(res) {
         if (res.success) { alert('Mensagem salva!'); $('#saveMessageModal').removeClass('active'); loadSavedMessages(); }
     });
@@ -488,4 +523,3 @@ function openLoadMessageModal() { $('#loadMessageModal').addClass('active'); }
 </script>
 </body>
 </html>
-
