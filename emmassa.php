@@ -23,7 +23,13 @@ function getMySQLConnection($servername, $username, $password, $dbname) {
 function getClientsFromVtabTitulos($servername, $username, $password, $dbname) {
     $conn = getMySQLConnection($servername, $username, $password, $dbname);
     if (!$conn) return [];
-    $sql = "SELECT DISTINCT upper(nome_res) as nome_res, REGEXP_REPLACE(celular,'[( )-]+','') AS celular FROM vtab_titulos WHERE cli_ativado = 's' ORDER BY nome_res ASC";
+    $sql = "SELECT DISTINCT upper(nome_res) as nome_res, 
+            REGEXP_REPLACE(celular,'[( )-]+','') AS celular 
+            FROM vtab_titulos WHERE cli_ativado = 's' 
+            AND vtab_titulos.nome_res IS NOT NULL AND TRIM(vtab_titulos.nome_res) <> ''
+            AND vtab_titulos.celular IS NOT NULL AND TRIM(vtab_titulos.celular) <> ''            
+            ORDER BY nome_res ASC";
+
     $result = $conn->query($sql);
     $clients = [];
     if ($result && $result->num_rows > 0) {
