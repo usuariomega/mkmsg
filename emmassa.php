@@ -98,8 +98,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             // Substituição de variáveis por balão
             $msgFinal = str_replace(
-                ['%cliente%', '%nome%', '%celular%', '%provedor%', '%site%', '%0A'], 
-                [$nome, $firstName, $celular, $provedor ?? '', $site ?? '', "\n"], 
+                ['%nomeresumido%', '%celular%', '%provedor%', '%site%', '%0A'], 
+                [$firstName, $celular, $provedor ?? '', $site ?? '', "\n"], 
                 $balao
             );
             
@@ -238,7 +238,7 @@ $tMax = isset($tempomax) ? (int)$tempomax : 90;
     .saved-item-actions { display: flex; gap: 8px; }
     .saved-item-actions button { padding: 6px 12px; font-size: 12px; height: auto; }
     .msg-section textarea { width: 100%; min-height: 180px; font-family: 'Courier New', Courier, monospace; font-size: 14px; line-height: 1.6; resize: vertical; margin-bottom: 12px; }
-    .whatsapp-bubble { background: #fff; padding: 10px 14px; border-radius: 8px; position: relative; max-width: 85%; font-size: 14px; line-height: 1.5; box-shadow: 0 1px 2px rgba(0,0,0,0.15); margin-bottom: 8px; word-wrap: break-word; white-space: pre-wrap; display: inline-block; width: auto; min-width: 50px; }
+    .whatsapp-bubble { background: #fff; padding: 10px 14px; border-radius: 8px; position: relative; max-width: 85%; font-size: 14px; line-height: 1.5; box-shadow: 0 1px 2px rgba(0,0,0,0.15); margin-bottom: 8px; word-wrap: break-word; white-space: pre-wrap; display: table; width: auto; min-width: 50px; }
     .whatsapp-bubble::before { content: ""; position: absolute; width: 0; height: 0; border-top: 10px solid transparent; border-bottom: 10px solid transparent; border-right: 10px solid #fff; left: -10px; top: 0; }
 </style>
 
@@ -313,7 +313,7 @@ $tMax = isset($tempomax) ? (int)$tempomax : 90;
                 </div>
                 <textarea id="messageContent" placeholder="Digite sua mensagem aqui..."></textarea>
                 <div class="coringas-list">
-                    <b>📌 Coringas:</b> %cliente%, %nome%, %provedor%, %site%<br>
+                    <b>📌 Coringas:</b> %nomeresumido%, %provedor%, %site%<br>
                     <b>⚡ Comandos:</b> %0A (Quebra), ## (Novo Balão), *texto* (Negrito)
                 </div>
                 <div class="mt-3"><button type="button" class="button button-small" onclick="openSaveMessageModal()">💾 Salvar Mensagem</button></div>
@@ -379,8 +379,7 @@ function updatePreview() {
     const input = $('#messageContent').val();
     const previewContainer = $('#preview');
     const mockData = { 
-        '%cliente%': '<b>João da Silva Xavier</b>', 
-        '%nome%': '<b>João</b>', 
+        '%nomeresumido%': '<b>João</b>', 
         '%provedor%': `<b>${PROVEDOR_NOME}</b>`, 
         '%site%': `<b>${PROVEDOR_SITE}</b>` 
     };

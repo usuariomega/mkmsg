@@ -6,9 +6,12 @@ if (isset($_POST['ajax_send']) || isset($_POST['get_all_ids'])) {
 
     if (isset($_POST['ajax_send'])) {
         $contato = $_POST['contato'];
-        $db = new SQLite3('db/msgdb.sqlite3');
-        $msgpago = $db->querySingle("SELECT msg FROM msgpago");
-        $db->close();
+        $jsonFile = __DIR__ . '/db/messages/pago.json';
+        $msgpago = "";
+        if (file_exists($jsonFile)) {
+            $jsonData = json_decode(file_get_contents($jsonFile), true);
+            $msgpago = $jsonData['content'] ?? "";
+        }
 
         $nome = $contato['nome_res'] ?? 'N/A';
         $celular = $contato['celular'] ?? '';

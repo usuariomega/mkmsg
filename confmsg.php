@@ -60,7 +60,7 @@ $msgpago    = $db->querySingle("SELECT msg FROM msgpago") ?: "";
                         <textarea name="msgnoprazo" id="input-noprazo" oninput="updatePreview('noprazo')"><?php echo htmlspecialchars($msgnoprazo); ?></textarea>
                         <div class="coringas-list">
                             <b>📌 Coringas Disponíveis:</b><br>
-                            %cliente%, %vencimento%, %valor%, %linhadig%, %qrcode%, %copiacola%, %provedor%, %site%<br>
+                            %nomeresumido%, %vencimento%, %valor%, %linhadig%, %qrcode%, %copiacola%, %provedor%, %site%<br>
                             <b>⚡ Comandos:</b> %0A (Quebra de Linha), ## (Novo Balão)
                         </div>
                     </div>
@@ -86,7 +86,7 @@ $msgpago    = $db->querySingle("SELECT msg FROM msgpago") ?: "";
                         <textarea name="msgvencido" id="input-vencido" oninput="updatePreview('vencido')"><?php echo htmlspecialchars($msgvencido); ?></textarea>
                         <div class="coringas-list">
                             <b>📌 Coringas Disponíveis:</b><br>
-                            %cliente%, %vencimento%, %valor%, %linhadig%, %qrcode%, %copiacola%, %provedor%, %site%<br>
+                            %nomeresumido%, %vencimento%, %valor%, %linhadig%, %qrcode%, %copiacola%, %provedor%, %site%<br>
                             <b>⚡ Comandos:</b> %0A (Quebra de Linha), ## (Novo Balão)
                         </div>
                     </div>
@@ -112,7 +112,7 @@ $msgpago    = $db->querySingle("SELECT msg FROM msgpago") ?: "";
                         <textarea name="msgpago" id="input-pago" oninput="updatePreview('pago')"><?php echo htmlspecialchars($msgpago); ?></textarea>
                         <div class="coringas-list">
                             <b>📌 Coringas Disponíveis:</b><br>
-                            %cliente%, %valor%, %datapago%, %provedor%, %site%<br>
+                            %nomeresumido%, %valor%, %datapago%, %provedor%, %site%<br>
                             <b>⚡ Comandos:</b> %0A (Quebra de Linha), ## (Novo Balão)
                         </div>
                     </div>
@@ -141,7 +141,6 @@ function updatePreview(type) {
     const previewContainer = document.getElementById('preview-' + type);
     
     const mockData = {
-        '%cliente%': '<b>João da Silva</b>',
         '%nomeresumido%': '<b>João</b>',
         '%vencimento%': '<b>10/02/2026</b>',
         '%valor%': '<b>R$ 99,90</b>',

@@ -31,9 +31,12 @@ foreach ($diaspago as $dias) {
 
     echo "[" . date('Y-m-d H:i:s') . "] Processando Dia $dias (" . $result->num_rows . " registros)...\n";
 
-    $db = new SQLite3('db/msgdb.sqlite3');
-    $msg = $db->querySingle("SELECT msg FROM msgpago");
-    $db->close();
+    $jsonFile = __DIR__ . '/db/messages/pago.json';
+    $msg = "";
+    if (file_exists($jsonFile)) {
+        $jsonData = json_decode(file_get_contents($jsonFile), true);
+        $msg = $jsonData['content'] ?? "";
+    }
 
     while ($row = $result->fetch_assoc()) {
         $nome = $row['nome_res'];

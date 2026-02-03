@@ -72,7 +72,7 @@ log "🚀 Iniciando instalação do sistema MK-MSG"
 log "📦 Instalando dependências de rede e sistema, aguarde..."
 echo "Apt::Cmd::Disable-Script-Warning true;" > /etc/apt/apt.conf.d/90disablescriptwarning
 apt-get update -qq
-apt-get install -y -qq apache2 apache2-utils sqlite3 php php-mysql php-sqlite3 php-curl git curl sshpass supervisor >/dev/null
+apt-get install -y -qq apache2 apache2-utils php php-mysql php-curl git curl sshpass supervisor >/dev/null
 
 # 3. Automação SSH no MK-Auth
 echo -e "\n--- Configuração do Servidor MK-Auth (Configurar acesso ao banco de dados) ---"
