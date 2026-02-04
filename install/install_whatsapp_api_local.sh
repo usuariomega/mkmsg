@@ -364,7 +364,7 @@ cat <<'EOF' > "$APP_DIR/public/index.html"
 :root{--bg:#f0f2f5;--card:#ffffff;--green:#25d366;--red:#ef4444;--border:#e5e7eb;--text:#1f2937;--muted:#6b7280;--primary:#075e54}
 *{box-sizing:border-box}html,body{width:100%;overflow-x:hidden;margin:0;padding:0}
 body{font-family:sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;min-height:100vh}
-.container{width:100%;max-width:900px;margin:0 auto;padding:15px;flex:1;display:flex;flex-direction:column}
+.container{width:100%;max-width:900px;max-height: 90vh;margin:0 auto;padding:15px;flex:1;display:flex;flex-direction:column;}
 .header{text-align:center;margin-bottom:20px}.title{font-size:22px;font-weight:800;color:var(--primary)}
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
 .card{background:var(--card);border-radius:12px;padding:15px;text-align:center;border:1px solid var(--border);box-shadow:0 2px 4px rgba(0,0,0,0.05)}
