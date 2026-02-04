@@ -11,8 +11,10 @@ $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) die("Erro de conexão: " . $conn->connect_error . "\n");
 
 foreach ($diasvencido as $dias) {
-    $sql = "SELECT upper(vtab_titulos.nome_res) as nome_res, REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS celular,
-            DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS datavenc, vtab_titulos.linhadig, sis_qrpix.qrcode
+    $sql = "SELECT upper(vtab_titulos.nome_res) as nome_res, 
+            REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS celular,
+            DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS datavenc, 
+            vtab_titulos.valor, vtab_titulos.linhadig, sis_qrpix.qrcode 
             FROM vtab_titulos
             LEFT JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo
             WHERE DATEDIFF(CURRENT_DATE(), vtab_titulos.datavenc) = $dias
@@ -40,8 +42,8 @@ foreach ($diasvencido as $dias) {
 
     while ($row = $result->fetch_assoc()) {
         $nome = $row['nome_res'];
-        $buscar = ['/%provedor%/', '/%nomeresumido%/', '/%vencimento%/', '/%linhadig%/', '/%copiacola%/', '/%site%/'];
-        $substituir = [$provedor, $nome, $row['datavenc'], $row['linhadig'], $row['qrcode'], $site];
+        $buscar = ['/%provedor%/', '/%nomeresumido%/', '/%vencimento%/', '/%valor%/', '/%linhadig%/', '/%copiacola%/', '/%site%/'];
+        $substituir = [$provedor, $nome, $row['datavenc'], $row['valor'], $row['linhadig'], urlencode($row['qrcode']), $site];
         $msgFinal = preg_replace($buscar, $substituir, $msg);
 
         $payload = ["numero" => "55" . $row['celular'], "mensagem" => $msgFinal];

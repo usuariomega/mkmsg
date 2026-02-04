@@ -16,11 +16,12 @@ if (isset($_POST['ajax_send']) || isset($_POST['get_all_ids'])) {
         $nome = $contato['nome_res'] ?? 'N/A';
         $celular = $contato['celular'] ?? '';
         $datavenc = $contato['datavenc'] ?? '';
+        $valor = $contato['valor'] ?? '';
         $linhadig = $contato['linhadig'] ?? '';
         $qrcode = $contato['qrcode'] ?? '';
 
-        $buscar = ['/%provedor%/', '/%nomeresumido%/', '/%vencimento%/', '/%linhadig%/', '/%copiacola%/', '/%site%/'];
-        $substituir = [$provedor, $nome, $datavenc, $linhadig, $qrcode, $site];
+        $buscar = ['/%provedor%/', '/%nomeresumido%/', '/%vencimento%/' , '/%valor%/', '/%linhadig%/', '/%copiacola%/', '/%site%/'];
+        $substituir = [$provedor, $nome, $datavenc, $valor, $linhadig, urlencode($qrcode), $site];
         $msgFinal = preg_replace($buscar, $substituir, $msgnoprazo);
 
         $payload = ["numero" => "55" . $celular, "mensagem" => $msgFinal];
@@ -63,7 +64,8 @@ if (isset($_POST['ajax_send']) || isset($_POST['get_all_ids'])) {
         $conn = new mysqli($servername, $username, $password, $dbname);
         $sql_todos = "SELECT upper(vtab_titulos.nome_res) as nome_res, 
                       REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS celular, 
-                      DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS datavenc, vtab_titulos.linhadig, sis_qrpix.qrcode 
+                      DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS datavenc, 
+                      vtab_titulos.valor, vtab_titulos.linhadig, sis_qrpix.qrcode 
                       FROM vtab_titulos 
                       LEFT JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo 
                       WHERE vtab_titulos.status = 'aberto' AND vtab_titulos.cli_ativado = 's' 
@@ -123,7 +125,8 @@ $total_paginas = ceil($total_registros / $limit);
 
 $sql = "SELECT vtab_titulos.uuid_lanc, upper(vtab_titulos.nome_res) as nome_res, 
         REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS celular, 
-        DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS datavenc, vtab_titulos.linhadig, sis_qrpix.qrcode 
+        DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS datavenc, 
+        vtab_titulos.valor, vtab_titulos.linhadig, sis_qrpix.qrcode 
         FROM vtab_titulos 
         LEFT JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo 
         $where_clause GROUP BY vtab_titulos.uuid_lanc
@@ -189,7 +192,9 @@ $result = $stmt->get_result();
                         <tr><td colspan="4" class="text-center" style="padding: 20px;">Nenhum registro encontrado.</td></tr>
                     <?php else: ?>
                         <?php while ($row = $result->fetch_assoc()): ?>
-                            <tr data-id="<?= $row['uuid_lanc'] ?>" data-nome="<?= htmlspecialchars($row['nome_res']) ?>" data-celular="<?= $row['celular'] ?>" data-venc="<?= $row['datavenc'] ?>" data-linha="<?= $row['linhadig'] ?>" data-qr="<?= $row['qrcode'] ?>">
+                            <tr data-id="<?= $row['uuid_lanc'] ?>" data-nome="<?= htmlspecialchars($row['nome_res']) ?>" 
+                                data-celular="<?= $row['celular'] ?>" data-venc="<?= $row['datavenc'] ?>" 
+                                data-valor="<?= $row['valor'] ?>" data-linha="<?= $row['linhadig'] ?>" data-qr="<?= $row['qrcode'] ?>">
                                 <td><strong><?= $row['nome_res'] ?></strong></td>
                                 <td class="hide-mobile"><?= $row['celular'] ?></td>
                                 <td><span class="badge" style="background-color: #f1f3f5;"><?= $row['datavenc'] ?></span></td>
@@ -273,7 +278,7 @@ $(document).ready(() => {
         const tr = $(this).closest('tr');
         const id = tr.data('id');
         const s = getSelected();
-        if (this.checked) s[id] = { nome_res: tr.data('nome'), celular: tr.data('celular'), datavenc: tr.data('venc'), linhadig: tr.data('linha'), qrcode: tr.data('qr') };
+        if (this.checked) s[id] = { nome_res: tr.data('nome'), celular: tr.data('celular'), datavenc: tr.data('venc'), valor: tr.data('valor'), linhadig: tr.data('linha'), qrcode: tr.data('qr') };
         else delete s[id];
         saveSelected(s);
     });

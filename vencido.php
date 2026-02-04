@@ -16,11 +16,12 @@ if (isset($_POST['ajax_send']) || isset($_POST['get_all_ids'])) {
         $nome = $contato['nome_res'] ?? 'N/A';
         $celular = $contato['celular'] ?? '';
         $datavenc = $contato['datavenc'] ?? '';
+        $valor = $contato['valor'] ?? '';
         $linhadig = $contato['linhadig'] ?? '';
         $qrcode = $contato['qrcode'] ?? '';
 
-        $buscar = ['/%provedor%/', '/%nomeresumido%/', '/%vencimento%/', '/%linhadig%/', '/%copiacola%/', '/%site%/'];
-        $substituir = [$provedor, $nome, $datavenc, $linhadig, $qrcode, $site];
+        $buscar = ['/%provedor%/', '/%nomeresumido%/', '/%vencimento%/' , '/%valor%/', '/%linhadig%/', '/%copiacola%/', '/%site%/'];
+        $substituir = [$provedor, $nome, $datavenc, $valor, $linhadig, urlencode($qrcode), $site];
         $msgFinal = preg_replace($buscar, $substituir, $msgvencido);
 
         $payload = ["numero" => "55" . $celular, "mensagem" => $msgFinal];
@@ -62,11 +63,14 @@ if (isset($_POST['ajax_send']) || isset($_POST['get_all_ids'])) {
     if (isset($_POST['get_all_ids'])) {
         $conn = new mysqli($servername, $username, $password, $dbname);
         $valorsel = $_GET['menumes'];
-        $sql_todos = "SELECT upper(vtab_titulos.nome_res) as nome_res, REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS celular, 
-                      DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS datavenc, vtab_titulos.linhadig, sis_qrpix.qrcode 
+        $sql_todos = "SELECT upper(vtab_titulos.nome_res) as nome_res, 
+                      REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS celular, 
+                      DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS datavenc, 
+                      vtab_titulos.valor, vtab_titulos.linhadig, sis_qrpix.qrcode 
                       FROM vtab_titulos 
                       LEFT JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo 
-                      WHERE DATE_FORMAT(datavenc,'%m-%Y') = ? AND vtab_titulos.status = 'vencido' AND vtab_titulos.cli_ativado = 's'
+                      WHERE DATE_FORMAT(datavenc,'%m-%Y') = ? 
+                      AND vtab_titulos.status = 'vencido' AND vtab_titulos.cli_ativado = 's'
                       AND (vtab_titulos.deltitulo = 0 OR vtab_titulos.deltitulo IS NULL)
                       AND vtab_titulos.nome_res IS NOT NULL AND TRIM(vtab_titulos.nome_res) <> ''
                       AND vtab_titulos.celular IS NOT NULL AND TRIM(vtab_titulos.celular) <> ''
@@ -101,7 +105,8 @@ $offset = ($page - 1) * $limit;
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) die("Erro de conexão: " . $conn->connect_error);
 
-$where_clause = "WHERE DATE_FORMAT(datavenc,'%m-%Y') = ? AND vtab_titulos.status = 'vencido' AND vtab_titulos.cli_ativado = 's'
+$where_clause = "WHERE DATE_FORMAT(datavenc,'%m-%Y') = ? 
+                 AND vtab_titulos.status = 'vencido' AND vtab_titulos.cli_ativado = 's'
                  AND (vtab_titulos.deltitulo = 0 OR vtab_titulos.deltitulo IS NULL)
                  AND vtab_titulos.nome_res IS NOT NULL AND TRIM(vtab_titulos.nome_res) <> ''
                  AND vtab_titulos.celular IS NOT NULL AND TRIM(vtab_titulos.celular) <> ''
@@ -123,8 +128,10 @@ $stmt_count->execute();
 $total_registros = $stmt_count->get_result()->fetch_assoc()['total'];
 $total_paginas = ceil($total_registros / $limit);
 
-$sql = "SELECT vtab_titulos.uuid_lanc, upper(vtab_titulos.nome_res) as nome_res, REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS celular, 
-        DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS datavenc, vtab_titulos.linhadig, sis_qrpix.qrcode 
+$sql = "SELECT vtab_titulos.uuid_lanc, upper(vtab_titulos.nome_res) as nome_res, 
+        REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS celular, 
+        DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS datavenc, 
+        vtab_titulos.valor, vtab_titulos.linhadig, sis_qrpix.qrcode 
         FROM vtab_titulos 
         LEFT JOIN sis_qrpix ON vtab_titulos.uuid_lanc = sis_qrpix.titulo 
         $where_clause GROUP BY vtab_titulos.uuid_lanc
@@ -203,7 +210,9 @@ $result = $stmt->get_result();
                         <tr><td colspan="4" class="text-center" style="padding: 20px;">Nenhum registro encontrado.</td></tr>
                     <?php else: ?>
                         <?php while ($row = $result->fetch_assoc()): ?>
-                            <tr data-id="<?= $row['uuid_lanc'] ?>" data-nome="<?= htmlspecialchars($row['nome_res']) ?>" data-celular="<?= $row['celular'] ?>" data-venc="<?= $row['datavenc'] ?>" data-linha="<?= $row['linhadig'] ?>" data-qr="<?= $row['qrcode'] ?>">
+                            <tr data-id="<?= $row['uuid_lanc'] ?>" data-nome="<?= htmlspecialchars($row['nome_res']) ?>" 
+                                data-celular="<?= $row['celular'] ?>" data-venc="<?= $row['datavenc'] ?>" 
+                                data-valor="<?= $row['valor'] ?>" data-linha="<?= $row['linhadig'] ?>" data-qr="<?= $row['qrcode'] ?>">
                                 <td><strong><?= $row['nome_res'] ?></strong></td>
                                 <td class="hide-mobile"><?= $row['celular'] ?></td>
                                 <td><span class="badge" style="background-color: #f1f3f5;"><?= $row['datavenc'] ?></span></td>
@@ -287,7 +296,7 @@ $(document).ready(() => {
         const tr = $(this).closest('tr');
         const id = tr.data('id');
         const s = getSelected();
-        if (this.checked) s[id] = { nome_res: tr.data('nome'), celular: tr.data('celular'), datavenc: tr.data('venc'), linhadig: tr.data('linha'), qrcode: tr.data('qr') };
+        if (this.checked) s[id] = { nome_res: tr.data('nome'), celular: tr.data('celular'), datavenc: tr.data('venc'), valor: tr.data('valor'), linhadig: tr.data('linha'), qrcode: tr.data('qr') };
         else delete s[id];
         saveSelected(s);
     });
