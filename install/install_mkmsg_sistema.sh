@@ -313,8 +313,11 @@ WEB_USER=${WEB_USER:-admin}
 
 read -sp "Senha para este novo usuário do painel web MK-MSG: (ex: mkmsg@admin)" PASS1
 PASS1=${PASS1:-mkmsg@admin}
+echo ""
 
 if htpasswd -bc /etc/apache2/.htpasswd "$WEB_USER" "$PASS1"; then
+    echo ""
+    echo ""
     log "✅ Usuário do painel criado com sucesso!"
     WEB_PASS="$PASS1"
  else
