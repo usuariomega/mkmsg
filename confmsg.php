@@ -1,4 +1,47 @@
-<?php include 'header.php'; ?>
+<?php 
+include 'header.php'; 
+
+// Configurações de Diretório
+$dataDir = __DIR__ . '/db/messages';
+if (!is_dir($dataDir)) mkdir($dataDir, 0755, true);
+
+// Caminhos dos arquivos para cada tipo de mensagem
+$fileNoPrazo = $dataDir . '/noprazo.json';
+$fileVencido = $dataDir . '/vencido.json';
+$filePago    = $dataDir . '/pago.json';
+
+// Função para salvar mensagem em arquivo JSON
+function salvarMensagemArquivo($caminho, $conteudo) {
+    $data = [
+        'content' => $conteudo,
+        'updatedAt' => date('Y-m-d H:i:s')
+    ];
+    return file_put_contents($caminho, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+}
+
+// Função para carregar mensagem do arquivo JSON
+function carregarMensagemArquivo($caminho) {
+    if (file_exists($caminho)) {
+        $data = json_decode(file_get_contents($caminho), true);
+        return $data['content'] ?? "";
+    }
+    return "";
+}
+
+// Processar o salvamento via POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['msgnoprazo'])) salvarMensagemArquivo($fileNoPrazo, $_POST['msgnoprazo']);
+    if (isset($_POST['msgvencido'])) salvarMensagemArquivo($fileVencido, $_POST['msgvencido']);
+    if (isset($_POST['msgpago']))    salvarMensagemArquivo($filePago, $_POST['msgpago']);
+    echo "<script>alert('✅ Configurações salvas com sucesso!'); window.location.href='confmsg.php';</script>";
+    exit;
+}
+
+// Carregar as mensagens atuais
+$msgnoprazo = carregarMensagemArquivo($fileNoPrazo);
+$msgvencido = carregarMensagemArquivo($fileVencido);
+$msgpago    = carregarMensagemArquivo($filePago);
+?>
 
 <!-- Cabeçalho da Página -->
 <div class="container">
@@ -22,28 +65,6 @@
             <button class="button3" onclick="location.href='confweb.php'" type="button">⚙️ Conf. geral</button>
         </div>
     </div>
-
-<?php
-$db = new SQLite3('db/msgdb.sqlite3');
-
-function salvarMensagem($db, $tabela, $coluna, $conteudo) {
-    $db->exec("DELETE FROM $tabela");
-    $stmt = $db->prepare("INSERT INTO $tabela ($coluna) VALUES (:conteudo)");
-    $stmt->bindValue(':conteudo', $conteudo, SQLITE3_TEXT);
-    return $stmt->execute();
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['msgnoprazo'])) salvarMensagem($db, 'msgnoprazo', 'msg', $_POST['msgnoprazo']);
-    if (isset($_POST['msgvencido'])) salvarMensagem($db, 'msgvencido', 'msg', $_POST['msgvencido']);
-    if (isset($_POST['msgpago']))    salvarMensagem($db, 'msgpago', 'msg', $_POST['msgpago']);
-    echo "<script>alert('✅ Configurações salvas com sucesso!'); window.location.href='confmsg.php';</script>";
-}
-
-$msgnoprazo = $db->querySingle("SELECT msg FROM msgnoprazo") ?: "";
-$msgvencido = $db->querySingle("SELECT msg FROM msgvencido") ?: "";
-$msgpago    = $db->querySingle("SELECT msg FROM msgpago") ?: "";
-?>
 
     <div class="container-conf">
         <form method="POST">
@@ -147,8 +168,8 @@ function updatePreview(type) {
         '%linhadig%': '<b>00190.00009 02714.720008 05071.402272 9 0000000000</b>',
         '%qrcode%': '<b>[QR CODE]</b>',
         '%copiacola%': '<b>00020101021226850014br.gov.bcb.pix...</b>',
-        '%provedor%': '<b><?php echo $provedor; ?></b>',
-        '%site%': '<b><?php echo $site; ?></b>',
+        '%provedor%': '<b><?php echo $provedor ?? "Provedor Exemplo"; ?></b>',
+        '%site%': '<b><?php echo $site ?? "www.exemplo.com.br"; ?></b>',
         '%datapago%': '<b>27/01/2026</b>'
     };
 
@@ -190,4 +211,3 @@ window.onload = function() {
 
 </body>
 </html>
-
