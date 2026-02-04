@@ -407,7 +407,7 @@ chmod +x "$INSTALL_DIR/daemon.php"
 # Recarregar Supervisor de forma silenciosa
 supervisorctl reread >/dev/null 2>&1
 supervisorctl update >/dev/null 2>&1
-supervisorctl start mkmsg >/dev/null 2>&1
+supervisorctl restart mkmsg >/dev/null 2>&1
 
 log "✅ Daemon de automação configurado e iniciado!"
 
@@ -419,7 +419,7 @@ log "--------------------------------------------------------"
 log ""
 log "PROVEDOR:       $PROVEDOR_NOME ($PROVEDOR_SITE)"
 log ""
-log "SISTEMA MK-MSG: http://$LOCAL_IP/mkmsg"
+log "MK-MSG:         http://$LOCAL_IP/mkmsg"
 log "Usuário:        $WEB_USER"
 log "Senha:          $WEB_PASS"
 log ""
@@ -430,8 +430,10 @@ log "                no prazo, pagos e vencidos. A conf. "
 log "                dos horários e dias ficam no portal web "
 log "                no botão Conf. geral "
 log ""
-log "Para gerenciar o daemon:"
+log "AGENDADOR:"
 log "Status:         sudo supervisorctl status mkmsg"
+log "Reiniciar:      sudo supervisorctl restart mkmsg"
+log "Logs:           sudo tail -n 10 /var/log/mkmsg/*
 log "--------------------------------------------------------"
 log ""
 log ""
