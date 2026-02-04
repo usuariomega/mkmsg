@@ -17,17 +17,26 @@ Visualize e gerencie o status de todos os títulos (boletos/faturas) dos seus cl
 #### Títulos No Prazo
 
 *Tela que exibe os títulos com vencimento futuro, prontos para o envio de lembretes preventivos.*
-<img width="1585" height="995" alt="noprazo" src="https://github.com/user-attachments/assets/2e8725ba-47ac-451f-8b5c-692a4f26b31e" /><br><br>
+<img width="1420" height="995" alt="noprazo" src="https://github.com/user-attachments/assets/13f14ab2-ef1a-4a9c-b28a-a657b91ad76d" />
+<br><br>
 
 #### Títulos Vencidos
 *Tela dedicada ao acompanhamento de títulos em atraso, essencial para a régua de cobrança.*
-<img width="1585" height="995" alt="vencidos" src="https://github.com/user-attachments/assets/5d69f293-aa79-47c1-8bde-9a2050f0494b" /><br><br>
+<img width="1420" height="995" alt="vencido" src="https://github.com/user-attachments/assets/4f199311-89e0-475d-b8cb-5a5fb47fed0e" />
+<br><br>
 
 
 #### Títulos Pagos
 *Confirmação visual dos títulos que já foram quitados, garantindo que o cliente receba a confirmação de pagamento.*
-<img width="1585" height="995" alt="pagos" src="https://github.com/user-attachments/assets/ee727ddf-3e41-4541-9d24-2d00a43b3c6d" /><br><br>
+<img width="1420" height="995" alt="pago" src="https://github.com/user-attachments/assets/cc1d397f-a142-4ee0-85bf-279c5c127624" />
+<br><br>
 
+
+#### Envio em massa
+*Permite enviar mensagens em massa para um grupo de clientes ou para todos. É possivel salvar a lista de clientes e de mensagens.*
+<img width="1420" height="1472" alt="emmassa" src="https://github.com/user-attachments/assets/949e54df-4adc-4c20-8539-53610269ef0e" />
+
+<br><br>
 
 ### 2. Configuração e Personalização de Mensagens
 
@@ -35,7 +44,8 @@ Defina o conteúdo exato das mensagens que serão enviadas para cada situação 
 
 #### Configuração de Mensagens
 *Interface intuitiva para edição das mensagens, com pré-visualização em tempo real do WhatsApp.*
-<img width="1585" height="2392" alt="confmsg" src="https://github.com/user-attachments/assets/9cf076e1-cde6-4655-a32e-023d3ab7dab6" /><br><br>
+<img width="1420" height="2375" alt="confmsg" src="https://github.com/user-attachments/assets/d584db69-b0ee-4f6d-8363-4d05a84169cf" />
+<br><br>
 
 
 ### 3. Dashboard e Configurações do Sistema
@@ -44,7 +54,8 @@ Gerencie a conexão com a API do WhatsApp e configure os parâmetros globais de 
 
 #### Configurações Gerais
 *Ajuste os tempos de pausa entre envios, os dias específicos para disparo de cada tipo de mensagem e os horários de execução do *daemon*.*
-<img width="1588" height="2837" alt="confgeral" src="https://github.com/user-attachments/assets/615e39f7-d802-40e7-b321-2f15cf813332" /><br><br>
+<img width="1420" height="2837" alt="confgeral" src="https://github.com/user-attachments/assets/080832a5-149c-4758-b302-d738a343eecd" />
+<br><br>
 
 
 
@@ -78,7 +89,9 @@ Gerencie a conexão com a API do WhatsApp e configure os parâmetros globais de 
 2.  Execute o comando abaixo:
 
 ```bash
-curl -O https://raw.githubusercontent.com/usuariomega/mkmsg/main/install/install_mkmsg.sh && sudo bash install_mkmsg.sh
+curl -O https://raw.githubusercontent.com/usuariomega/mkmsg/main/install/install_mkmsg.sh
+chmod +x install_mkmsg.sh
+sudo ./install_mkmsg.sh
 ```
 
 ### 📝 O que o instalador fará por você:
