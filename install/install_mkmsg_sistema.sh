@@ -94,7 +94,7 @@ done
 SSH_SUCCESS=false
 for attempt in {1..3}; do
     read -sp "Senha SSH do MK-Auth (tentativa $attempt/3): " MK_SSH_PASS
-    echo ""
+    echo -e "\n"
     if [ -z "$MK_SSH_PASS" ]; then
         warn "❌ ERRO: A senha não pode estar vazia."
         continue
@@ -121,7 +121,7 @@ NEW_DB_USER=${NEW_DB_USER:-mkmsglerdb}
 
 while true; do
     read -sp "Senha para este novo usuário ($NEW_DB_USER): " NEW_DB_PASS
-    echo ""
+    echo -e "\n"
     NEW_DB_PASS=${NEW_DB_PASS:-mkmsgsenhadodb}
     if [ -z "$NEW_DB_PASS" ]; then
         warn "❌ ERRO: A senha não pode estar vazia."
@@ -142,7 +142,7 @@ else
     warn "⚠️ Senha padrão falhou."
     for attempt in {1..3}; do
         read -sp "Digite a senha ROOT do MySQL do MK-Auth (tentativa $attempt/3): " DB_ROOT_PASS
-        echo ""
+        echo -e "\n"
         if [ -z "$DB_ROOT_PASS" ]; then
             warn "❌ ERRO: A senha não pode estar vazia."
             continue
@@ -236,14 +236,15 @@ fi
 #Se ainda não tem token, perguntar ao usuário
 if [ -z "$API_TOKEN" ]; then
     while true; do
-        echo ""
+        echo -e "\n"
         echo "Token não encontrado. Escolha uma opção:"
-        echo ""
+        echo -e "\n"
         echo "  1) Gerar um novo token aleatório (20 caracteres)"
         echo "  2) Digitar um token customizado"
-        echo ""
+        echo -e "\n"
         
         read -p "Digite sua escolha (1 ou 2): " TOKEN_CHOICE
+        echo -e "\n"
         
         if [ "$TOKEN_CHOICE" = "1" ]; then
             log "🔑 Gerando novo token..."
@@ -263,10 +264,6 @@ if [ -z "$API_TOKEN" ]; then
         fi
     done
 fi
-
-echo ""
-log "🔐 Token: $API_TOKEN"
-echo ""
 
 # 7. Clonar Repositório e Configurar Sistema
 log "📥 Clonando repositório do MK-MSG..."
@@ -298,7 +295,7 @@ rm -rf "$INSTALL_DIR"
 
 log "📥 Clonando o repositório MK-MSG..."
 cd /var/www/html
-git clone https://github.com/usuariomega/mkmsg.git >/dev/null
+git clone https://github.com/usuariomega/mkmsg.git >/dev/null 2>&1
 
 if [ ! -d "$INSTALL_DIR" ]; then
     error "Erro ao clonar o repositório MK-MSG. Verifique sua conexão com a internet."
@@ -309,7 +306,8 @@ log "✅ Repositório clonado com sucesso!"
 # Configurar usuário e senha do painel web
 echo -e "\n--- Configuração de Acesso ao Painel Web MK-MSG---"
 while true; do
-    read -p "Usuário que deseja criar para acessar o painel web MK-MSG: " WEB_USER
+    read -p "\nUsuário que deseja criar para acessar o painel web MK-MSG: " WEB_USER
+    echo -e "\n"
     if [ -z "$WEB_USER" ]; then
         warn "❌ ERRO: O usuário não pode estar vazio."
         continue
@@ -319,17 +317,19 @@ done
 
 while true; do
     read -sp "Senha para este novo usuário do painel web MK-MSG: " PASS1
-    echo ""
+    echo -e "\n"
     if [ -z "$PASS1" ]; then
         warn "❌ ERRO: A senha não pode estar vazia."
         continue
     fi
     read -sp "Confirme a senha: " PASS2
-    echo ""
+    echo -e "\n"
     if [ "$PASS1" != "$PASS2" ]; then
         warn "❌ ERRO: As senhas não coincidem."
+        echo -e "\n"
     else
         if htpasswd -bc /etc/apache2/.htpasswd "$WEB_USER" "$PASS1"; then
+            echo -e "\n"
             log "✅ Usuário do painel criado com sucesso!"
             WEB_PASS="$PASS1"
             break
