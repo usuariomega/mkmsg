@@ -362,6 +362,7 @@ systemctl restart apache2
 log "🤖 Configurando sistema de automação com Supervisor e Rotação Mensal..."
 
 # Criar diretório de logs e ajustar permissões
+rm -rf /var/log/mkmsg
 mkdir -p /var/log/mkmsg
 chown www-data:www-data /var/log/mkmsg
 
