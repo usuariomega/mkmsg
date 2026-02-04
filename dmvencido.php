@@ -22,7 +22,7 @@ foreach ($diasvencido as $dias) {
             AND (vtab_titulos.deltitulo = 0 OR vtab_titulos.deltitulo IS NULL)
             AND vtab_titulos.nome_res IS NOT NULL AND TRIM(vtab_titulos.nome_res) <> ''
             AND vtab_titulos.celular IS NOT NULL AND TRIM(vtab_titulos.celular) <> ''
-            AND vtab_titulos.linhadig IS NOT NULL AND TRIM(vtab_titulos.linhadig) <> ''"
+            AND vtab_titulos.linhadig IS NOT NULL AND TRIM(vtab_titulos.linhadig) <> ''
             GROUP BY vtab_titulos.uuid_lanc ORDER BY nome_res ASC";
     
     $result = $conn->query($sql);
