@@ -25,9 +25,9 @@ function getClientsFromVtabTitulos($servername, $username, $password, $dbname) {
     if (!$conn) return [];
     $sql = "SELECT DISTINCT upper(nome_res) as nome_res, 
             REGEXP_REPLACE(celular,'[( )-]+','') AS celular 
-            FROM vtab_titulos WHERE cli_ativado = 's' 
-            AND vtab_titulos.nome_res IS NOT NULL AND TRIM(vtab_titulos.nome_res) <> ''
-            AND vtab_titulos.celular IS NOT NULL AND TRIM(vtab_titulos.celular) <> ''            
+            FROM sis_cliente WHERE cli_ativado = 's' 
+            AND nome_res IS NOT NULL AND TRIM(nome_res) <> '' 
+            AND celular IS NOT NULL AND TRIM(celular) <> '' 
             ORDER BY nome_res ASC";
 
     $result = $conn->query($sql);
