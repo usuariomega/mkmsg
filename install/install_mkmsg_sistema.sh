@@ -234,8 +234,8 @@ if [ -z "$API_TOKEN" ]; then
 fi
 
 #Se ainda não tem token, perguntar ao usuário
-while true; do
-    if [ -z "$API_TOKEN" ]; then
+if [ -z "$API_TOKEN" ]; then
+    while true; do
         echo ""
         echo "Token não encontrado. Escolha uma opção:"
         echo ""
@@ -254,14 +254,15 @@ while true; do
             read -p "Digite o token (20 caracteres recomendado): " API_TOKEN
             if [ -z "$API_TOKEN" ]; then
                 error "Token não pode estar vazio."
+                continue
             fi
             log "✅ Token fornecido: $API_TOKEN"
             break
         else
             warn "❌ Opção inválida. Por favor, escolha 1 ou 2."
         fi
-    fi
-done
+    done
+fi
 
 echo ""
 log "🔐 Token: $API_TOKEN"
