@@ -142,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if (file_exists("$root/logs/.ler/modelo/index.php")) copy("$root/logs/.ler/modelo/index.php", "$dir/index.php");
         }
         $logFile = "$dir/emmassa_" . date("d-M-Y") . ".log";
-        file_put_contents($logFile, sprintf("%s;%s;%s;%s\n", date("d-m-Y"), date("H:i:s"), $nome, $allSuccess ? "Sucesso (Múltiplos Balões)" : "Falha: " . $lastError), FILE_APPEND);
+        file_put_contents($logFile, sprintf("%s;%s;%s;%s\n", date("d-m-Y"), date("H:i:s"), $nome, $allSuccess ? $response : $lastError), FILE_APPEND);
         
         echo json_encode(['success' => $allSuccess, 'nome' => $nome, 'response' => implode(' | ', $responses)]);
         exit;
