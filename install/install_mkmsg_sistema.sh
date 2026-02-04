@@ -94,14 +94,16 @@ done
 SSH_SUCCESS=false
 for attempt in {1..3}; do
     read -sp "Senha SSH do MK-Auth (tentativa $attempt/3): " MK_SSH_PASS
-    echo -e "\n"
+    echo ""
     if [ -z "$MK_SSH_PASS" ]; then
         warn "❌ ERRO: A senha não pode estar vazia."
         continue
     fi
     if sshpass -p "$MK_SSH_PASS" ssh $SSH_OPTS root@$MK_IP "exit" 2>/dev/null; then
         SSH_SUCCESS=true
+        echo ""
         log "✅ Conexão SSH estabelecida com sucesso!"
+        echo ""
         break
     else
         warn "❌ Falha ao conectar via SSH. Verifique a senha ou o acesso root no MK-Auth."
@@ -113,16 +115,16 @@ if [ "$SSH_SUCCESS" = false ]; then
 fi
 
 # 4. Configuração do Banco de Dados
-echo -e "\n--- Configuração do Banco de Dados MK-Auth ---"
+echo -e "--- Configuração do Banco de Dados MK-Auth ---"
 
 # Dados do novo usuário que será criado
 read -p "Usuário que deseja criar para ler o banco (ex: mkmsglerdb): " NEW_DB_USER
 NEW_DB_USER=${NEW_DB_USER:-mkmsglerdb}
 
 while true; do
-    read -sp "Senha para este novo usuário ($NEW_DB_USER): " NEW_DB_PASS
-    echo -e "\n"
+    read -sp "Senha para este novo usuário (ex: mkmsgsenhadodb): " NEW_DB_PASS
     NEW_DB_PASS=${NEW_DB_PASS:-mkmsgsenhadodb}
+    echo ""
     if [ -z "$NEW_DB_PASS" ]; then
         warn "❌ ERRO: A senha não pode estar vazia."
         continue
@@ -133,6 +135,7 @@ done
 DB_ROOT_PASS="vertrigo"
 DB_SUCCESS=false
 
+echo ""
 log "🔍 Verificando acesso ao MySQL no MK-Auth..."
 
 if sshpass -p "$MK_SSH_PASS" ssh $SSH_OPTS root@$MK_IP "mysql -u root -p$DB_ROOT_PASS -e 'SELECT 1;' >/dev/null 2>&1"; then
@@ -142,7 +145,7 @@ else
     warn "⚠️ Senha padrão falhou."
     for attempt in {1..3}; do
         read -sp "Digite a senha ROOT do MySQL do MK-Auth (tentativa $attempt/3): " DB_ROOT_PASS
-        echo -e "\n"
+        echo ""
         if [ -z "$DB_ROOT_PASS" ]; then
             warn "❌ ERRO: A senha não pode estar vazia."
             continue
@@ -206,9 +209,9 @@ while true; do
     fi
     break
 done
+echo ""
 
 # 6. Token da API WhatsApp
-
 # Detectar o usuário que chamou o script (se foi com sudo)
 if [ -n "$SUDO_USER" ]; then
     TARGET_USER="$SUDO_USER"
@@ -236,15 +239,15 @@ fi
 #Se ainda não tem token, perguntar ao usuário
 if [ -z "$API_TOKEN" ]; then
     while true; do
-        echo -e "\n"
+        echo ""
         echo "Token não encontrado. Escolha uma opção:"
-        echo -e "\n"
+        echo ""
         echo "  1) Gerar um novo token aleatório (20 caracteres)"
         echo "  2) Digitar um token customizado"
-        echo -e "\n"
+        echo ""
         
         read -p "Digite sua escolha (1 ou 2): " TOKEN_CHOICE
-        echo -e "\n"
+        echo ""
         
         if [ "$TOKEN_CHOICE" = "1" ]; then
             log "🔑 Gerando novo token..."
@@ -305,39 +308,19 @@ log "✅ Repositório clonado com sucesso!"
 
 # Configurar usuário e senha do painel web
 echo -e "\n--- Configuração de Acesso ao Painel Web MK-MSG---"
-while true; do
-    read -p "\nUsuário que deseja criar para acessar o painel web MK-MSG: " WEB_USER
-    echo -e "\n"
-    if [ -z "$WEB_USER" ]; then
-        warn "❌ ERRO: O usuário não pode estar vazio."
-        continue
-    fi
-    break
-done
+read -p "Usuário que deseja criar para acessar o painel web MK-MSG (ex: admin): " WEB_USER
+WEB_USER=${WEB_USER:-admin}
 
-while true; do
-    read -sp "Senha para este novo usuário do painel web MK-MSG: " PASS1
-    echo -e "\n"
-    if [ -z "$PASS1" ]; then
-        warn "❌ ERRO: A senha não pode estar vazia."
-        continue
-    fi
-    read -sp "Confirme a senha: " PASS2
-    echo -e "\n"
-    if [ "$PASS1" != "$PASS2" ]; then
-        warn "❌ ERRO: As senhas não coincidem."
-        echo -e "\n"
-    else
-        if htpasswd -bc /etc/apache2/.htpasswd "$WEB_USER" "$PASS1"; then
-            echo -e "\n"
-            log "✅ Usuário do painel criado com sucesso!"
-            WEB_PASS="$PASS1"
-            break
-        else
-            error "Erro ao criar o arquivo de senhas do Apache."
-        fi
-    fi
-done
+read -sp "Senha para este novo usuário do painel web MK-MSG: (ex: mkmsg@admin)" PASS1
+PASS1=${PASS1:-mkmsg@admin}
+
+if htpasswd -bc /etc/apache2/.htpasswd "$WEB_USER" "$PASS1"; then
+    log "✅ Usuário do painel criado com sucesso!"
+    WEB_PASS="$PASS1"
+ else
+    error "Erro ao criar o arquivo de senhas do Apache."
+fi
+echo ""
 
 # 8. Atualizar config.php
 log "📝 Atualizando config.php..."

@@ -88,6 +88,7 @@ if [ -z "$FIXED_TOKEN" ]; then
     echo ""
     
     read -p "Digite sua escolha (1, 2 ou 3): " TOKEN_CHOICE
+    echo ""
     
     if [ "$TOKEN_CHOICE" = "1" ]; then
         log "🔑 Gerando novo token..."
@@ -145,12 +146,14 @@ rm -rf "$APP_DIR"
 log "🚀 Instalando dependências do sistema..."
 apt-get update -qq
 apt-get install -y -qq curl git ca-certificates build-essential >/dev/null
+echo "Apt::Cmd::Disable-Script-Warning true;" > /etc/apt/apt.conf.d/90disablescriptwarning
+
 
 # 3. Node.js & PM2
 if ! command -v node >/dev/null; then
     log "🌐 Instalando Node.js $NODE_VERSION..."
-    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - >/dev/null
-    apt-get install -y -qq nodejs >/dev/null
+    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - >/dev/null 
+    apt-get install -y -qq nodejs >/dev/null 2>&1
 fi
 
 if ! command -v pm2 >/dev/null; then
@@ -181,7 +184,7 @@ EOF
 chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/package.json"
 
 log "💾 Instalando dependências do projeto (npm install)..."
-su - "$TARGET_USER" -c "cd $APP_DIR && npm install --quiet --no-fund --no-audit 2>&1 | grep -v 'npm notice' | grep -v 'npm warn' || true"
+su - "$TARGET_USER" -c "cd $APP_DIR && npm install --quiet --no-fund --no-audit 2>&1 | grep -v 'npm notice' | grep -v 'npm warn' | grep -v 'added' || true"
 
 # 6. Configuração
 log "⚙️  Criando arquivo de configuração..."
@@ -252,15 +255,39 @@ import express from 'express'
 import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
 import QRCode from 'qrcode'
 import fs from 'fs'
+import path from 'path'
 import pino from 'pino'
 import { API_TOKEN, PORT } from './config.js'
 import { addToQueue, getQueueSize, getSentLogs } from './queue.js'
 
 const app = express()
-const __dirname = new URL('.', import.meta.url).pathname
 app.use(express.json())
 app.use(express.static('public'))
-app.get('/', (req, res) => res.sendFile(__dirname + 'public/index.html'))
+
+app.get('/', (req, res) => res.sendFile(path.join(process.cwd(), 'public/index.html')))
+
+app.get('/logs', (req, res) => {
+  res.sendFile(path.join(process.cwd(), 'public/log_viewer.html'))
+})
+
+app.get('/logs-data', (req, res) => {
+  const logDir = path.join(process.cwd(), 'logs')
+  if (!fs.existsSync(logDir)) return res.send('Nenhum diretório de log encontrado.')
+  const files = fs.readdirSync(logDir).filter(f => f.endsWith('.log')).sort().reverse()
+  if (files.length === 0) return res.send('Nenhum arquivo de log encontrado.')
+  const latestLog = path.join(logDir, files[0])
+  const content = fs.readFileSync(latestLog, 'utf8')
+  res.send(content)
+})
+
+app.get('/status', (req, res) => {
+  res.json({
+    status: status,
+    qr: qrBase64,
+    queue: getQueueSize(),
+    sent: getSentLogs()
+  })
+})
 
 let sock, status = 'disconnected', qrBase64 = null
 
@@ -288,13 +315,11 @@ function normalizeMessage(msg) {
 
 async function connectToWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState('auth')
-  
   sock = makeWASocket({
     auth: state,
     logger: pino({ level: 'silent' }),
     browser: ['macOS', 'Chrome', '144.0.7559.96']
   })
-
   sock.ev.on('creds.update', saveCreds)
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update
@@ -309,7 +334,6 @@ async function connectToWhatsApp() {
   })
 }
 
-app.get('/status', (req, res) => res.json({ status, qr: qrBase64, queue: getQueueSize(), sent: getSentLogs() }))
 app.post('/send', auth, (req, res) => {
   const { numero, mensagem } = req.body
   if (!numero || !mensagem || status !== 'connected') return res.json({ status: 'error' })
@@ -353,7 +377,8 @@ body{font-family:sans-serif;background:var(--bg);color:var(--text);display:flex;
 .l-meta{display:flex;align-items:center;gap:8px;margin-bottom:6px}.tag{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;text-transform:uppercase}
 .sent{background:#dcfce7;color:#166534}.err{background:#fee2e2;color:#991b1b}.msg{word-break:break-word;line-height:1.4;color:#4b5563}
 @media(min-width:600px){.title{font-size:28px}.l-row{flex-direction:row;align-items:center}.l-meta{margin-bottom:0;width:280px;flex-shrink:0}.msg{flex:1}}
-button{padding:6px 12px;border:none;border-radius:6px;background:#374151;color:#fff;cursor:pointer;font-size:12px}
+button{padding:6px 12px;border:none;border-radius:6px;background:#374151;color:#fff;cursor:pointer;font-size:12px;margin-left:5px}
+.btn-group{display:flex;align-items:center}
 </style>
 </head>
 <body>
@@ -361,10 +386,24 @@ button{padding:6px 12px;border:none;border-radius:6px;background:#374151;color:#
   <div class="header"><div class="title">📲 WhatsApp API Dashboard</div></div>
   <div class="stats"><div class="card"><span class="label">Status</span><div id="st" class="val">---</div></div><div class="card"><span class="label">Fila de Envio</span><div id="q" class="val">0</div></div></div>
   <div class="qr"><img id="qri" style="display:none"></div>
-  <div class="logs"><div class="l-head"><span>📜 Logs de Atividade</span><button id="ps">⏸ Pausar</button></div><div id="lb" class="l-body"></div></div>
+  <div class="logs">
+    <div class="l-head">
+      <span>📜 Logs de Atividade (Últimas 10)</span>
+      <div class="btn-group">
+        <button id="ps">⏸ Pausar</button>
+        <button id="openLog" onclick="window.open('/logs', '_blank')">📂 Abrir Log</button>
+        <button id="clearLog" onclick="clearLocalLog()">🧹 Limpar Log</button>
+      </div>
+    </div>
+    <div id="lb" class="l-body"></div>
+  </div>
 </div>
 <script>
 let sc=true;const ps=document.getElementById('ps');ps.onclick=()=>{sc=!sc;ps.textContent=sc?'⏸ Pausar':'▶ Retomar'};
+function clearLocalLog() {
+  const lb = document.getElementById('lb');
+  lb.innerHTML = '<div style="padding:20px;text-align:center;color:#999">Log limpo pelo usuário</div>';
+}
 async function up(){
   try{
     const r=await fetch('/status');const d=await r.json();
@@ -373,14 +412,19 @@ async function up(){
     document.getElementById('q').textContent = d.queue || 0;
     const qri=document.getElementById('qri');if(d.qr){qri.src=d.qr;qri.style.display='inline'}else{qri.style.display='none'}
     if(d.status==='connected'){
-      lb.innerHTML='';if((d.sent??[]).length === 0) lb.innerHTML='<div style="padding:20px;text-align:center;color:#999">Nenhum log disponível</div>';
-      (d.sent??[]).forEach(l=>{
-        const row=document.createElement('div');row.className='l-row';const tc=l.status==='sent'?'sent':'err';
-        row.innerHTML=`<div class="l-meta"><span>${l.date}</span><span class="tag ${tc}">${l.status}</span></div><div class="msg">${l.mensagem}</div>`;
-        lb.appendChild(row);
-      });
+      if(sc) {
+        lb.innerHTML='';
+        const logs = (d.sent??[]);
+        const last10 = logs.slice(-10);
+        if(last10.length === 0) lb.innerHTML='<div style="padding:20px;text-align:center;color:#999">Nenhum log disponível</div>';
+        last10.forEach(l=>{
+          const row=document.createElement('div');row.className='l-row';const tc=l.status==='sent'?'sent':'err';
+          row.innerHTML=`<div class="l-meta"><span>${l.date}</span><span class="tag ${tc}">${l.status}</span></div><div class="msg">${l.mensagem}</div>`;
+          lb.appendChild(row);
+        });
+        if(lb.lastChild) lb.scrollTop=lb.scrollHeight;
+      }
     }else{lb.innerHTML='<div style="padding:20px;text-align:center;color:#999">Aguardando conexão...</div>'}
-    if(sc&&lb.lastChild)lb.scrollTop=lb.scrollHeight;
   }catch(e){}
 }
 setInterval(up,5000);up();
@@ -391,32 +435,83 @@ EOF
 chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/public/index.html"
 
 # 10. Debug
-log "📝 Criando script de debug..."
-cat <<EOF > "$APP_DIR/debug.sh"
-#!/bin/bash
-echo "--- STATUS PM2 ---"
-pm2 status $APP_NAME
-echo ""
-echo "--- ÚLTIMOS LOGS (ARQUIVO) ---"
-ls -t logs/*.log | head -n 1 | xargs tail -n 20
+log "📝 Criando visualizador de logs..."
+cat <<'EOF' > "$APP_DIR/public/log_viewer.html"
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visualizador de Logs - WhatsApp API</title>
+<style>
+:root{--bg:#f0f2f5;--card:#ffffff;--primary:#075e54;--text:#1f2937;--border:#e5e7eb}
+body{font-family:sans-serif;background:var(--bg);color:var(--text);margin:0;padding:20px}
+.container{max-width:1000px;margin:0 auto;background:var(--card);border-radius:12px;border:1px solid var(--border);box-shadow:0 2px 4px rgba(0,0,0,0.05);overflow:hidden;display:flex;flex-direction:column;height:90vh}
+.header{padding:15px 20px;background:var(--primary);color:white;display:flex;justify-content:space-between;align-items:center}
+.header h1{margin:0;font-size:18px}.log-content{flex:1;overflow-y:auto;padding:15px;font-family:monospace;font-size:13px;line-height:1.5;white-space:pre-wrap;background:#1e1e1e;color:#d4d4d4}
+.controls{padding:10px 20px;background:#f9fafb;border-top:1px solid var(--border);display:flex;gap:10px}
+button{padding:8px 15px;border:none;border-radius:6px;background:#374151;color:white;cursor:pointer;font-size:13px}
+.status-sent{color:#4ade80}.status-error{color:#f87171}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header"><h1>📜 Logs do Sistema (Arquivo)</h1><button onclick="window.close()">Fechar</button></div>
+  <div id="logContent" class="log-content">Carregando logs...</div>
+  <div class="controls"><button onclick="loadLogs()">Atualizar</button><button onclick="scrollToBottom()">Ir para o fim</button></div>
+</div>
+<script>
+async function loadLogs(){
+  const logDiv=document.getElementById('logContent');
+  try{
+    const r=await fetch('/logs-data');if(!r.ok)throw new Error('Erro ao carregar logs');
+    const text=await r.text();
+    const coloredText=text.replace(/\[SENT\]/g,'<span class="status-sent">[SENT]</span>').replace(/\[ERROR\]/g,'<span class="status-error">[ERROR]</span>');
+    logDiv.innerHTML=coloredText||'Nenhum registro encontrado.';scrollToBottom();
+  }catch(e){logDiv.textContent='Erro: '+e.message}
+}
+function scrollToBottom(){const logDiv=document.getElementById('logContent');logDiv.scrollTop=logDiv.scrollHeight}
+loadLogs();setInterval(loadLogs,30000);
+</script>
+</body>
+</html>
 EOF
-chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/debug.sh"
-chmod +x "$APP_DIR/debug.sh"
+chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/public/log_viewer.html"
 
 # 11. PHP (exemplo de integração)
-log "📝 Criando exemplo de integração PHP..."
-cat <<EOF > "$APP_DIR/exemplo.php"
-<?php
+log "📝 Criando arquivo de exemplos..."
+cat <<EOF > "$APP_DIR/public/exemplo.html"
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exemplos de Envio - WhatsApp API</title>
+<style>
+body{font-family:Arial,sans-serif;line-height:1.6;margin:0;padding:20px;background-color:#f4f4f4;color:#333}
+.container{max-width:900px;margin:20px auto;background:#fff;padding:30px;border-radius:8px;box-shadow:0 0 10px rgba(0,0,0,0.1)}
+h1,h2,h3{color:#075e54}pre{background-color:#eee;padding:15px;border-radius:5px;overflow-x:auto;font-family:monospace;font-size:0.9em}
+.note{background-color:#fff3cd;border-left:5px solid #ffc107;padding:10px;margin:20px 0;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Exemplos de Envio de Mensagens</h1>
+<div class="note">Substitua <strong>${FIXED_TOKEN}</strong> pelo seu token e ajuste a URL se necessário.</div>
+<h2>1. PHP</h2>
+<pre><code>&lt;?php
 \$api_url = 'http://localhost:${PORT}/send';
 \$api_token = '${FIXED_TOKEN}';
-\$data = ["numero" => "5511999999999", "mensagem" => "Teste 1 2 3"];
-\$options = ['http' => ['header' => "Content-type: application/json\r\n" . "x-api-token: \$api_token\r\n", 'method' => 'POST', 'content' => json_encode(\$data), 'ignore_errors' => true]];
+\$data = ["numero" => "5511999999999", "mensagem" => "Teste via PHP"];
+\$options = ['http' => ['header' => "Content-type: application/json\r\n" . "x-api-token: \$api_token\r\n", 'method' => 'POST', 'content' => json_encode(\$data)]];
 \$context = stream_context_create(\$options);
-\$result = file_get_contents(\$api_url, false, \$context);
-echo "Resposta: " . \$result . PHP_EOL;
-?>
+echo file_get_contents(\$api_url, false, \$context);
+?&gt;</code></pre>
+<h2>2. Bash (curl)</h2>
+<pre><code>curl -X POST -H "Content-Type: application/json" -H "x-api-token: ${FIXED_TOKEN}" -d '{"numero": "5511999999999", "mensagem": "Teste via Curl"}' http://localhost:${PORT}/send</code></pre>
+</div>
+</body>
+</html>
 EOF
-chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/exemplo.php"
+chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/public/exemplo.html"
 
 # 12. Iniciar com PM2 e configurar Startup
 log "🚀 Iniciando a API com PM2..."
@@ -429,23 +524,22 @@ STARTUP_CMD=$(su - "$TARGET_USER" -c "pm2 startup systemd" | grep "sudo" | sed '
 if [ -n "$STARTUP_CMD" ]; then
     eval "$STARTUP_CMD" >/dev/null 2>&1
 fi
-echo ""
+
 echo ""
 log "✅ INSTALAÇÃO DA API WHATSAPP CONCLUÍDA!"
 log "-------------------------------------------------------"
-log "🌐 Abra a página para ler o QR Code:"
-log "   http://localhost:${PORT}"
+log "🌐 Abra a página para ler o QR Code e iniciar a sessão:"
+log "   http://$(hostname -I | awk '{print $1}'):${PORT}"
+log ""
+log "📄 Exemplos de integração disponíveis em:"
+log "   http://$(hostname -I | awk '{print $1}'):${PORT}/exemplo.html"
 log ""
 log "🔑 Token da API: ${FIXED_TOKEN}"
-log "👤 Usuário: $TARGET_USER"
-log "📁 Diretório: $APP_DIR"
 log "-------------------------------------------------------"
 log "📝 Comandos úteis:"
 log "   Ver status: pm2 status"
 log "   Ver logs: pm2 logs $APP_NAME"
 log "   Parar: pm2 stop $APP_NAME"
 log "   Reiniciar: pm2 restart $APP_NAME"
-log "   Remover: pm2 delete $APP_NAME"
 log "-------------------------------------------------------"
-echo ""
 echo ""
