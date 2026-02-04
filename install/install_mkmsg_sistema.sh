@@ -433,7 +433,7 @@ log ""
 log "AGENDADOR:"
 log "Status:         sudo supervisorctl status mkmsg"
 log "Reiniciar:      sudo supervisorctl restart mkmsg"
-log "Logs:           sudo tail -n 10 /var/log/mkmsg/*
+log "Logs:           sudo tail -n 10 /var/log/mkmsg/* "
 log "--------------------------------------------------------"
 log ""
 log ""
