@@ -96,7 +96,7 @@ sudo ./install_mkmsg.sh
 
 ### 📝 O que o instalador fará por você:
 
-*   Instalará todas as dependências (Apache, PHP, SQLite, etc).
+*   Instalará todas as dependências (Apache, PHP, etc).
 *   Configurará o acesso remoto ao banco de dados do seu **MK-Auth** via SSH.
 *   Gerará um **Token de Segurança** exclusivo de 20 caracteres.
 *   Instalará e configurará a **API do WhatsApp** localmente.
