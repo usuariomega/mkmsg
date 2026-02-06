@@ -43,7 +43,7 @@ fi
 
 LOCAL_IP=$(hostname -I | awk '{print $1}')
 
-echo -e "\n"
+echo ""
 
 log "🚀 Iniciando instalação do sistema MK-MSG"
 
