@@ -61,7 +61,7 @@ if (isset($_POST['ajax_send']) || isset($_POST['get_all_ids'])) {
     }
 
     if (isset($_POST['get_all_ids'])) {
-        $conn = new mysqli($servername, $username, $password, $dbname);
+        $conn = new mysqli($servername, $username, $password, $dbname, $port);
         $sql_todos = "SELECT upper(vtab_titulos.nome_res) as nome_res, 
                       REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS celular, 
                       DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS datavenc, 
@@ -100,7 +100,7 @@ $limit = (int)($_GET['limit'] ?? 10);
 $page = (int)($_GET['page'] ?? 1);
 $offset = ($page - 1) * $limit;
 
-$conn = new mysqli($servername, $username, $password, $dbname);
+$conn = new mysqli($servername, $username, $password, $dbname, $port);
 if ($conn->connect_error) die("Erro de conexão: " . $conn->connect_error);
 
 $where_clause = "WHERE vtab_titulos.status = 'aberto' AND vtab_titulos.cli_ativado = 's' 

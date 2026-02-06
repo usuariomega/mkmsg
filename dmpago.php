@@ -7,7 +7,7 @@ include 'config.php';
 
 if (!is_array($diaspago)) $diaspago = [$diaspago];
 
-$conn = new mysqli($servername, $username, $password, $dbname);
+$conn = new mysqli($servername, $username, $password, $dbname, $port);
 if ($conn->connect_error) die("Erro de conexão: " . $conn->connect_error . "\n");
 
 foreach ($diaspago as $dias) {

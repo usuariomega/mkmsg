@@ -12,6 +12,9 @@ $password = "mkmsgsenhadodb";
 //Nome do banco de dados do do MK-Auth
 $dbname = "mkradius";
 
+//Porta do banco de dados para o túnel
+$port = "3306";
+
 //Nome do seu provedor
 $provedor = "XYZ";
 
@@ -31,7 +34,7 @@ date_default_timezone_set('America/Sao_Paulo');
 //Para os títulos no prazo
 //Formato: array de inteiros representando quantos dias antes avisar
 //Exemplo: [1, 3, 7] = avisa 1, 3 e 7 dias antes do vencimento
-$diasnoprazo = [1, 10];
+$diasnoprazo = [1];
 
 //Envio automático: Múltiplos dias após vencer
 //Para os títulos vencidos
@@ -47,9 +50,9 @@ $diaspago = [1];
 
 //Horários de envio automático (formato HH:MM)
 //O daemon verifica a cada minuto se chegou a hora de enviar
-$horario_vencido = "10:00";
-$horario_noprazo = "08:00";
-$horario_pago = "12:00";
+$horario_vencido = "08:00";
+$horario_noprazo = "09:00";
+$horario_pago = "10:00";
 
 //Tempo de pausa de envio entre os clientes
 //Tempo mínimo = 30 segundos, máximmo = 120 segundos

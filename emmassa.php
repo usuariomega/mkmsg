@@ -9,9 +9,9 @@ if (!is_dir($listsDir)) mkdir($listsDir, 0755, true);
 if (!is_dir($messagesDir)) mkdir($messagesDir, 0755, true);
 
 // Funções Auxiliares
-function getMySQLConnection($servername, $username, $password, $dbname) {
+function getMySQLConnection($servername, $username, $password, $dbname, $port) {
     try {
-        $conn = new mysqli($servername, $username, $password, $dbname);
+        $conn = new mysqli($servername, $username, $password, $dbname, $port);
         if ($conn->connect_error) return null;
         $conn->set_charset("utf8mb4");
         return $conn;
@@ -20,8 +20,8 @@ function getMySQLConnection($servername, $username, $password, $dbname) {
     }
 }
 
-function getClientsFromVtabTitulos($servername, $username, $password, $dbname) {
-    $conn = getMySQLConnection($servername, $username, $password, $dbname);
+function getClientsFromVtabTitulos($servername, $username, $password, $dbname, $port) {
+    $conn = getMySQLConnection($servername, $username, $password, $dbname, $port);
     if (!$conn) return [];
     // CORREÇÃO: Selecionar o ID real do cliente (id) para evitar problemas de deslocamento
     $sql = "SELECT id, upper(nome_res) as nome_res, 
@@ -224,7 +224,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 // Se não for AJAX, carregar a página normalmente
 include 'config.php';
 include 'header.php';
-$clients = getClientsFromVtabTitulos($servername, $username, $password, $dbname);
+$clients = getClientsFromVtabTitulos($servername, $username, $password, $dbname, $port);
 
 // Garantir que as variáveis de tempo existam (fallback caso não estejam no config.php)
 $tMin = isset($tempomin) ? (int)$tempomin : 10;

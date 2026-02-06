@@ -51,7 +51,7 @@ log "🚀 Iniciando instalação do sistema MK-MSG"
 log "📦 Instalando dependências de rede e sistema, aguarde..."
 echo "Apt::Cmd::Disable-Script-Warning true;" > /etc/apt/apt.conf.d/90disablescriptwarning
 apt-get update -qq
-apt-get install -y -qq apache2 apache2-utils php php-mysql php-curl git curl sshpass autossh supervisor >/dev/null
+apt-get install -y -qq apache2 apache2-utils php php-mysql php-curl git curl sshpass autossh supervisor net-tools >/dev/null
 
 # 3. Automação SSH no MK-Auth
 echo -e "\n--- Configuração do Servidor MK-Auth (Configurar acesso ao banco de dados) ---"
@@ -143,6 +143,21 @@ if [[ "$REMOTE_RESULT" == *"RESTORED"* ]]; then
     echo -e "\n"
 fi
 
+log "🔗 Verificando disponibilidade de porta para o túnel..."
+
+# Lógica para escolher a porta
+DB_PORT=3306
+if netstat -tuln | grep -q ":$DB_PORT "; then
+    warn "⚠️  Porta $DB_PORT já está em uso. Procurando porta alternativa..."
+    while true; do
+        DB_PORT=$(( ( RANDOM % 30001 )  + 20000 ))
+        if ! netstat -tuln | grep -q ":$DB_PORT "; then
+            break
+        fi
+    done
+else
+fi
+
 log "🔗 Configurando túnel criptografado SSH persistente com autossh..."
 
 # Configuração do Supervisor para o autossh (Lado Cliente)
@@ -153,7 +168,7 @@ chown www-data:www-data /var/log/mkmsg
 
 cat > /etc/supervisor/conf.d/ssh_tunnel.conf << EOF
 [program:mkmsgtun]
-command=/usr/bin/autossh -M 0 -N -o "StrictHostKeyChecking=no" -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3" -o "ExitOnForwardFailure yes" -p $MK_PORT -L 3306:127.0.0.1:3306 root@$MK_IP
+command=/usr/bin/autossh -M 0 -N -o "StrictHostKeyChecking=no" -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3" -o "ExitOnForwardFailure yes" -p $MK_PORT -L $DB_PORT:127.0.0.1:3306 root@$MK_IP
 user=root
 autostart=true
 autorestart=true
@@ -165,7 +180,7 @@ supervisorctl reread >/dev/null 2>&1
 supervisorctl update >/dev/null 2>&1
 supervisorctl restart mkmsgtun >/dev/null 2>&1
 
-log "✅ Túnel SSH configurado (Porta Local 3306 -> MK-Auth:3306)"
+log "✅ Túnel SSH configurado (Porta Local $DB_PORT -> MK-Auth:3306)"
 
 # 5. Informações do Provedor
 echo -e "\n--- Informações do Provedor ---"
@@ -182,7 +197,7 @@ while true; do
 done
 echo ""
 
-# 6. Token da API WhatsApp
+# 6. Token da API WhatsApp e IP da API
 # Detectar o usuário que chamou o script (se foi com sudo)
 if [ -n "$SUDO_USER" ]; then
     TARGET_USER="$SUDO_USER"
@@ -194,10 +209,26 @@ fi
 
 # Configurações
 APP_DIR="$TARGET_HOME/whatsapp-server"
+INSTALL_DIR="/var/www/html/mkmsg"
+BACKUP_DIR="${INSTALL_DIR}_backup"
 
 API_TOKEN=""
+API_WSIP=""
 
-#Se ainda não tem token, tentar obter do arquivo de configuração do WhatsApp (se já existe)
+# Tentar obter do backup se existir
+if [ -d "$BACKUP_DIR" ] && [ -f "$BACKUP_DIR/config.php" ]; then
+    API_TOKEN=$(grep '\$token' "$BACKUP_DIR/config.php" | grep -oP '"\K[^"]+' | head -1)
+    API_WSIP=$(grep '\$wsip' "$BACKUP_DIR/config.php" | grep -oP '"\K[^"]+' | head -1)
+    
+    if [ -n "$API_TOKEN" ]; then
+        log "✅ Token recuperado do backup: $API_TOKEN"
+    fi
+    if [ -n "$API_WSIP" ]; then
+        log "✅ IP da API recuperado do backup: $API_WSIP"
+    fi
+fi
+
+# Se não encontrou no backup, tentar obter da instalação atual (se ainda existir)
 if [ -z "$API_TOKEN" ]; then
     if [ -f "$APP_DIR/config.js" ]; then
         API_TOKEN=$(grep 'API_TOKEN' "$APP_DIR/config.js" | grep -oP '"\K[^"]+' | head -1)
@@ -207,17 +238,7 @@ if [ -z "$API_TOKEN" ]; then
     fi
 fi
 
-# Tentar obter o token do config.php
-if [ -z "$API_TOKEN" ]; then
-    if [ -f "/var/www/html/mkmsg/config.php" ]; then
-        API_TOKEN=$(grep '\$token' /var/www/html/mkmsg/config.php | grep -oP '"\K[^"]+' | head -1)
-        if [ -n "$API_TOKEN" ]; then
-            log "✅ Token obtido do config.php: $API_TOKEN"
-        fi
-    fi
-fi
-
-#Se ainda não tem token, perguntar ao usuário
+# Se ainda não tem token, perguntar ao usuário
 if [ -z "$API_TOKEN" ]; then
     while true; do
         echo ""
@@ -250,15 +271,9 @@ if [ -z "$API_TOKEN" ]; then
 fi
 
 # 7. Clonar Repositório e Configurar Sistema
-log "📥 Clonando repositório do MK-MSG..."
-INSTALL_DIR="/var/www/html/mkmsg"
-
 log "📥 Verificando instalações anteriores..."
 
 if [ -d "$INSTALL_DIR" ]; then
-
-    BACKUP_DIR="${INSTALL_DIR}_backup"
-    BACKUP_REC="${INSTALL_DIR}_backup/db"
     
     warn "⚠️  Instalação anterior detectada em $INSTALL_DIR"
     log "📦 Realizando backup da instalação anterior..."
@@ -286,15 +301,15 @@ if [ ! -d "$INSTALL_DIR" ]; then
     error "Erro ao clonar o repositório MK-MSG. Verifique sua conexão com a internet."
 fi
 
-#Recuperar backup de Conf. msg
-if [ -d "$BACKUP_REC" ]; then
-    cp -Rf "$BACKUP_REC" "$INSTALL_DIR/"
+log "✅ Repositório clonado com sucesso!"
+
+# Recuperar backup de Conf. msg (db)
+if [ -d "$BACKUP_DIR/db" ]; then
+    cp -rf "$BACKUP_DIR/db" "$INSTALL_DIR/"
     log "✅ Backup de API e Conf. msg recuperados com sucesso!"
 fi
 
-log "✅ Repositório clonado com sucesso!"
-
-#Configurar usuário e senha do painel web
+# Configurar usuário e senha do painel web
 echo -e "\n--- Configuração de Acesso ao Painel Web MK-MSG---"
 read -p "Usuário que deseja criar para acessar o painel web MK-MSG (ex: admin): " WEB_USER
 WEB_USER=${WEB_USER:-admin}
@@ -326,11 +341,14 @@ echo ""
 # 8. Atualizar config.php
 log "📝 Atualizando config.php..."
 CONFIG_FILE="$INSTALL_DIR/config.php"
+
 sed -i "s/\$servername = .*/\$servername = \"127.0.0.1\";/" "$CONFIG_FILE"
 sed -i "s/\$username = .*/\$username = \"root\";/" "$CONFIG_FILE"
 sed -i "s/\$password = .*/\$password = \"vertrigo\";/" "$CONFIG_FILE"
+sed -i "s/\$port = .*/\$port = \"$DB_PORT\";/" "$CONFIG_FILE"
 sed -i "s/\$provedor = .*/\$provedor = \"$PROVEDOR_NOME\";/" "$CONFIG_FILE"
 sed -i "s/\$site = .*/\$site = \"$PROVEDOR_SITE\";/" "$CONFIG_FILE"
+sed -i "s/\$wsip = .*/\$wsip = \"$API_WSIP\";/" "$CONFIG_FILE"
 sed -i "s/\$token = .*/\$token = \"$API_TOKEN\";/" "$CONFIG_FILE"
 
 # 9. Permissões e Apache
@@ -405,7 +423,9 @@ log "MK-MSG:         http://$LOCAL_IP/mkmsg"
 log "Usuário:        $WEB_USER"
 log "Senha:          $WEB_PASS"
 log ""
+log "Porta DB:       $DB_PORT"
 log "Token:          $API_TOKEN"
+log "IP API:         $API_WSIP"
 log ""
 log "--------------------------------------------------------"
 log "💡 AUTOMAÇÃO:   O sistema usa um daemon que envia "
