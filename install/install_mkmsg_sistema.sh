@@ -227,6 +227,10 @@ if [ -d "$BACKUP_DIR" ] && [ -f "$BACKUP_DIR/config.php" ]; then
     fi
 fi
 
+if [ -z "$API_WSIP" ]; then
+    API_WSIP="127.0.0.1"
+fi
+
 # Se não encontrou no backup, tentar obter da instalação atual (se ainda existir)
 if [ -z "$API_TOKEN" ]; then
     if [ -f "$APP_DIR/config.js" ]; then
