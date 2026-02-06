@@ -37,8 +37,7 @@ if grep -qi "devuan" /etc/os-release; then
     error "INSTALAÇÃO CANCELADA: Este sistema não pode ser instalado dentro do MK-Auth. Use o MK-MSG em uma máquina separada."
 fi
 
-echo -e "\n"
-
+echo ""
 log "🚀 Bem-vindo ao Instalador MK-MSG!"
 echo ""
 

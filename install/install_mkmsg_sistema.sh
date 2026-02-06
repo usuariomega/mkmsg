@@ -309,7 +309,7 @@ while true; do
     if [ "$PASS1" != "$PASS2" ]; then
         warn "❌ ERRO: As senhas não coincidem."
     else
-        if htpasswd -bc /etc/apache2/.htpasswd "$WEB_USER" "$PASS1"; then
+        if htpasswd -bc /etc/apache2/.htpasswd "$WEB_USER" "$PASS1" >/dev/null 2>&1; then
             echo ""
             log "✅ Usuário do painel criado com sucesso!"
             WEB_PASS="$PASS1"
@@ -339,8 +339,8 @@ sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOve
 sed -i 's/ServerTokens OS/ServerTokens Prod/' /etc/apache2/conf-enabled/security.conf
 sed -i 's/ServerSignature On/ServerSignature Off/' /etc/apache2/conf-enabled/security.conf
 
-a2enmod rewrite
-systemctl restart apache2
+a2enmod rewrite >/dev/null 2>&1
+systemctl restart apache2 >/dev/null 2>&1
 
 # 10. Instalar e Configurar Supervisor + Daemon + Rotação de Logs Mensal
 log "🤖 Configurando sistema de automação com Supervisor e Rotação Mensal..."
