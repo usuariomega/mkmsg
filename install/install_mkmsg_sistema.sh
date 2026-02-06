@@ -13,32 +13,19 @@ log() { echo -e "${GREEN}[INFO]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
-# Opções comuns do SSH para ignorar erros de host key
-SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o LogLevel=ERROR"
-
-# Função para validar se um IP é válido e privado
-validate_private_ip() {
+# Função para validar se um IP é válido (formato dos octetos)
+validate_ip_format() {
     local ip=$1
     if ! [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "invalid_format"
-        return
+        return 1
     fi
     IFS='.' read -r octet1 octet2 octet3 octet4 <<< "$ip"
     for octet in $octet1 $octet2 $octet3 $octet4; do
         if ! [[ $octet =~ ^[0-9]+$ ]] || [ "$octet" -lt 0 ] || [ "$octet" -gt 255 ]; then
-            echo "invalid_format"
-            return
+            return 1
         fi
     done
-    
-    if [[ $ip =~ ^10\. ]] || \
-       [[ $ip =~ ^100\.(6[4-9]|7[0-9]|8[0-9]|9[0-9]|1[0-1][0-9]|12[0-7])\. ]] || \
-       [[ $ip =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || \
-       [[ $ip =~ ^192\.168\. ]]; then
-            echo "private"
-            return
-    fi
-    echo "public"
+    return 0
 }
 
 # 1. Verificações de Segurança e Ambiente
@@ -55,16 +42,8 @@ if grep -qi "devuan" /etc/os-release; then
 fi
 
 LOCAL_IP=$(hostname -I | awk '{print $1}')
-ip_type=$(validate_private_ip "$LOCAL_IP")
-IS_PRIVATE=false
 
-if [[ "$ip_type" == "private" ]]; then
-    IS_PRIVATE=true
-fi
-
-if [ "$IS_PRIVATE" = false ]; then
-    error "FALHA DE SEGURANÇA: O servidor possui um IP público ($LOCAL_IP). Este sistema só permite instalação em rede local (IP Privado). Abortando."
-fi
+echo -e "\n"
 
 log "🚀 Iniciando instalação do sistema MK-MSG"
 
@@ -72,41 +51,49 @@ log "🚀 Iniciando instalação do sistema MK-MSG"
 log "📦 Instalando dependências de rede e sistema, aguarde..."
 echo "Apt::Cmd::Disable-Script-Warning true;" > /etc/apt/apt.conf.d/90disablescriptwarning
 apt-get update -qq
-apt-get install -y -qq apache2 apache2-utils php php-mysql php-curl git curl sshpass supervisor >/dev/null
+apt-get install -y -qq apache2 apache2-utils php php-mysql php-curl git curl sshpass autossh supervisor >/dev/null
 
 # 3. Automação SSH no MK-Auth
 echo -e "\n--- Configuração do Servidor MK-Auth (Configurar acesso ao banco de dados) ---"
 
 while true; do
     read -p "IP do Servidor MK-Auth: " MK_IP
-    IP_VALIDATION=$(validate_private_ip "$MK_IP")
-    if [ "$IP_VALIDATION" = "invalid_format" ]; then
+    if ! validate_ip_format "$MK_IP"; then
         warn "❌ ERRO: IP inválido ($MK_IP). Digite um IP válido (xxx.xxx.xxx.xxx)"
-        continue
-    fi
-    if [ "$IP_VALIDATION" = "public" ]; then
-        warn "❌ ERRO: O IP informado ($MK_IP) é público. Apenas IPs privados são permitidos."
         continue
     fi
     break
 done
 
+read -p "Porta SSH do Servidor MK-Auth (22): " MK_PORT
+MK_PORT=${MK_PORT:-22}
+
+# Opções comuns do SSH
+SSH_OPTS="-p $MK_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o LogLevel=ERROR"
+
+# Gerar chave SSH se não existir
+if [ ! -f /root/.ssh/id_rsa ]; then
+    ssh-keygen -t ed25519 -f /root/.ssh/id_rsa -N "" >/dev/null
+fi
+
 SSH_SUCCESS=false
 for attempt in {1..3}; do
     read -sp "Senha SSH do MK-Auth (tentativa $attempt/3): " MK_SSH_PASS
-    echo ""
+    echo -e "\n"
     if [ -z "$MK_SSH_PASS" ]; then
         warn "❌ ERRO: A senha não pode estar vazia."
         continue
     fi
-    if sshpass -p "$MK_SSH_PASS" ssh $SSH_OPTS root@$MK_IP "exit" 2>/dev/null; then
-        SSH_SUCCESS=true
-        echo ""
-        log "✅ Conexão SSH estabelecida com sucesso!"
-        echo ""
-        break
+    
+    log "⏳ Tentando configurar acesso SSH (tentativa $attempt/3)..."
+    if sshpass -p "$MK_SSH_PASS" ssh-copy-id $SSH_OPTS root@$MK_IP >/dev/null 2>&1; then
+        if ssh $SSH_OPTS root@$MK_IP "exit" >/dev/null 2>&1; then
+            SSH_SUCCESS=true
+            log "✅ Conexão SSH estabelecida com sucesso!"
+            break
+        fi
     else
-        warn "❌ Falha ao conectar via SSH. Verifique a senha ou o acesso root no MK-Auth."
+        warn "❌ Falha ao conectar via SSH na tentativa $attempt."
     fi
 done
 
@@ -115,86 +102,68 @@ if [ "$SSH_SUCCESS" = false ]; then
 fi
 
 # 4. Configuração do Banco de Dados
-echo -e "--- Configuração do Banco de Dados MK-Auth ---"
+log "⚙️ Verificando e ajustando configurações no servidor remoto..."
 
-# Dados do novo usuário que será criado
-read -p "Usuário que deseja criar para ler o banco (ex: mkmsglerdb): " NEW_DB_USER
-NEW_DB_USER=${NEW_DB_USER:-mkmsglerdb}
-
-while true; do
-    read -sp "Senha para este novo usuário (ex: mkmsgsenhadodb): " NEW_DB_PASS
-    NEW_DB_PASS=${NEW_DB_PASS:-mkmsgsenhadodb}
-    echo ""
-    if [ -z "$NEW_DB_PASS" ]; then
-        warn "❌ ERRO: A senha não pode estar vazia."
-        continue
-    fi
-    break
-done
-
-DB_ROOT_PASS="vertrigo"
-DB_SUCCESS=false
-
-echo ""
-log "🔍 Verificando acesso ao MySQL no MK-Auth..."
-
-if sshpass -p "$MK_SSH_PASS" ssh $SSH_OPTS root@$MK_IP "mysql -u root -p$DB_ROOT_PASS -e 'SELECT 1;' >/dev/null 2>&1"; then
-    DB_SUCCESS=true
-    log "✅ Conexão com MySQL confirmada!"
-else
-    warn "⚠️ Senha padrão falhou."
-    for attempt in {1..3}; do
-        read -sp "Digite a senha ROOT do MySQL do MK-Auth (tentativa $attempt/3): " DB_ROOT_PASS
-        echo ""
-        if [ -z "$DB_ROOT_PASS" ]; then
-            warn "❌ ERRO: A senha não pode estar vazia."
-            continue
-        fi
-        if sshpass -p "$MK_SSH_PASS" ssh $SSH_OPTS root@$MK_IP "mysql -u root -p$DB_ROOT_PASS -e 'SELECT 1;' >/dev/null 2>&1"; then
-            DB_SUCCESS=true
-            log "✅ Senha ROOT do MySQL validada!"
-            break
-        else
-            warn "❌ Senha ROOT do MySQL incorreta."
-        fi
-    done
-fi
-
-if [ "$DB_SUCCESS" = false ]; then
-    error "Falha ao validar a senha ROOT do MySQL após 3 tentativas. Abortando."
-fi
-
-log "⚙️ Configurando MySQL remotamente no MK-Auth..."
-
-BIND_CONF="
-# Configurar bind-address
+REMOTE_DB_CONFIG="
+# Verificar bind-address no servidor remoto
 BIND_FILE='/etc/mysql/conf.d/50-server.cnf'
-if [ -f \"\$BIND_FILE\" ]; then
-    sed -i 's/bind-address.*/bind-address = 0.0.0.0/' \"\$BIND_FILE\"
-else
-    sed -i 's/bind-address.*/bind-address = 0.0.0.0/' /etc/mysql/mariadb.conf.d/50-server.cnf 2>/dev/null || \
-    sed -i 's/bind-address.*/bind-address = 0.0.0.0/' /etc/mysql/my.cnf 2>/dev/null
+if [ ! -f \"\$BIND_FILE\" ]; then
+    BIND_FILE='/etc/mysql/mariadb.conf.d/50-server.cnf'
+fi
+if [ ! -f \"\$BIND_FILE\" ]; then
+    BIND_FILE='/etc/mysql/my.cnf'
 fi
 
-# Reiniciar serviços
-service mysql restart >/dev/null 2>&1
-sleep 2
-service freeradius restart >/dev/null 2>&1
+CURRENT_BIND=\$(grep '^bind-address' \"\$BIND_FILE\" | awk '{print \$3}')
+if [ \"\$CURRENT_BIND\" != \"127.0.0.1\" ]; then
+    sed -i 's/bind-address.*/bind-address = 127.0.0.1/' \"\$BIND_FILE\"
+    service mysql restart >/dev/null 2>&1
+    echo 'RESTORED'
+else
+    echo 'OK'
+fi
 
-# Criar usuário e dar permissões
-mysql -u root -p$DB_ROOT_PASS -e \"
-    DROP USER IF EXISTS '$NEW_DB_USER'@'%';
-    CREATE USER '$NEW_DB_USER'@'%' IDENTIFIED BY '$NEW_DB_PASS';
-    GRANT SELECT ON mkradius.* TO '$NEW_DB_USER'@'%';
-    FLUSH PRIVILEGES;
-\" >/dev/null 2>&1
+# Garantir permissões de túnel SSH
+sed -i 's/^#\?AllowTcpForwarding.*/AllowTcpForwarding yes/' /etc/ssh/sshd_config
+sed -i 's/^#\?PermitTunnel.*/PermitTunnel yes/' /etc/ssh/sshd_config
+sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+service ssh restart
 "
 
-if sshpass -p "$MK_SSH_PASS" ssh $SSH_OPTS root@$MK_IP "$BIND_CONF"; then
-    log "✅ MySQL configurado e usuário '$NEW_DB_USER' criado com sucesso!"
-else
-    error "Erro ao executar a configuração remota no MK-Auth."
+REMOTE_RESULT=$(ssh $SSH_OPTS root@$MK_IP "$REMOTE_DB_CONFIG")
+
+if [[ "$REMOTE_RESULT" == *"RESTORED"* ]]; then
+    echo -e "\n"
+    warn "⚠️  O IP do banco de dados foi restaurado para o original do Mk-Auth (127.0.0.1)."
+    warn "⚠️  Se você tem outra integração, ela poderá parar de funcionar."
+    warn "⚠️  Diga a seu consultor para usar tunel SSH!"
+    echo -e "\n"
 fi
+
+log "🔗 Configurando túnel SSH persistente com autossh..."
+
+# Configuração do Supervisor para o autossh (Lado Cliente)
+# Criar diretório de logs e ajustar permissões
+rm -rf /var/log/mkmsg
+mkdir -p /var/log/mkmsg
+chown www-data:www-data /var/log/mkmsg
+
+cat > /etc/supervisor/conf.d/ssh_tunnel.conf << EOF
+[program:mkmsgtun]
+command=/usr/bin/autossh -M 0 -N -o "StrictHostKeyChecking=no" -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3" -o "ExitOnForwardFailure yes" -p $MK_PORT -L 3306:127.0.0.1:3306 root@$MK_IP
+user=root
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/mkmsg/mkmsgtun_error.log
+stdout_logfile=/var/log/mkmsg/mkmsgtun_output.log
+EOF
+
+supervisorctl reread >/dev/null 2>&1
+supervisorctl update >/dev/null 2>&1
+supervisorctl restart mkmsgtun >/dev/null 2>&1
+
+log "✅ Túnel SSH configurado (Porta Local 3306 -> MK-Auth:3306)"
 
 # 5. Informações do Provedor
 echo -e "\n--- Informações do Provedor ---"
@@ -232,6 +201,16 @@ if [ -z "$API_TOKEN" ]; then
         API_TOKEN=$(grep 'API_TOKEN' "$APP_DIR/config.js" | grep -oP '"\K[^"]+' | head -1)
         if [ -n "$API_TOKEN" ]; then
             log "✅ Token obtido da instalação anterior: $API_TOKEN"
+        fi
+    fi
+fi
+
+# Tentar obter o token do config.php
+if [ -z "$API_TOKEN" ]; then
+    if [ -f "/var/www/html/mkmsg/config.php" ]; then
+        API_TOKEN=$(grep '\$token' /var/www/html/mkmsg/config.php | grep -oP '"\K[^"]+' | head -1)
+        if [ -n "$API_TOKEN" ]; then
+            log "✅ Token obtido do config.php: $API_TOKEN"
         fi
     fi
 fi
@@ -275,19 +254,20 @@ INSTALL_DIR="/var/www/html/mkmsg"
 log "📥 Verificando instalações anteriores..."
 
 if [ -d "$INSTALL_DIR" ]; then
-    BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-    BACKUP_DIR="${INSTALL_DIR}_backup_${BACKUP_TIMESTAMP}"
+
+    BACKUP_DIR="${INSTALL_DIR}_backup"
+    BACKUP_REC="${INSTALL_DIR}_backup/db"
     
     warn "⚠️  Instalação anterior detectada em $INSTALL_DIR"
     log "📦 Realizando backup da instalação anterior..."
-    log "   Origem: $INSTALL_DIR"
-    log "   Destino: $BACKUP_DIR"
+    log "📦 Origem: $INSTALL_DIR"
+    log "📦 Destino: $BACKUP_DIR"
     
+    rm -Rf "$BACKUP_DIR"
     mv "$INSTALL_DIR" "$BACKUP_DIR"
     
     if [ $? -eq 0 ]; then
         log "✅ Backup realizado com sucesso!"
-        log "   Você pode restaurar com: sudo mv $BACKUP_DIR $INSTALL_DIR"
     else
         error "Erro ao criar backup. Abortando."
     fi
@@ -304,33 +284,49 @@ if [ ! -d "$INSTALL_DIR" ]; then
     error "Erro ao clonar o repositório MK-MSG. Verifique sua conexão com a internet."
 fi
 
+#Recuperar backup de Conf. msg
+if [ -d "$BACKUP_REC" ]; then
+    cp -Rf "$BACKUP_REC" "$INSTALL_DIR/"
+    log "✅ Backup de API e Conf. msg recuperados com sucesso!"
+fi
+
 log "✅ Repositório clonado com sucesso!"
 
-# Configurar usuário e senha do painel web
+#Configurar usuário e senha do painel web
 echo -e "\n--- Configuração de Acesso ao Painel Web MK-MSG---"
 read -p "Usuário que deseja criar para acessar o painel web MK-MSG (ex: admin): " WEB_USER
 WEB_USER=${WEB_USER:-admin}
 
-read -sp "Senha para este novo usuário do painel web MK-MSG: (ex: mkmsg@admin)" PASS1
-PASS1=${PASS1:-mkmsg@admin}
-echo ""
-
-if htpasswd -bc /etc/apache2/.htpasswd "$WEB_USER" "$PASS1"; then
+while true; do
+    read -sp "Senha para este novo usuário do painel web MK-MSG: " PASS1
     echo ""
+    if [ -z "$PASS1" ]; then
+        warn "❌ ERRO: A senha não pode estar vazia."
+        continue
+    fi
+    read -sp "Confirme a senha: " PASS2
     echo ""
-    log "✅ Usuário do painel criado com sucesso!"
-    WEB_PASS="$PASS1"
- else
-    error "Erro ao criar o arquivo de senhas do Apache."
-fi
+    if [ "$PASS1" != "$PASS2" ]; then
+        warn "❌ ERRO: As senhas não coincidem."
+    else
+        if htpasswd -bc /etc/apache2/.htpasswd "$WEB_USER" "$PASS1"; then
+            echo ""
+            log "✅ Usuário do painel criado com sucesso!"
+            WEB_PASS="$PASS1"
+            break
+        else
+            error "Erro ao criar o arquivo de senhas do Apache."
+        fi
+    fi
+done
 echo ""
 
 # 8. Atualizar config.php
 log "📝 Atualizando config.php..."
 CONFIG_FILE="$INSTALL_DIR/config.php"
-sed -i "s/\$servername = .*/\$servername = \"$MK_IP\";/" "$CONFIG_FILE"
-sed -i "s/\$username = .*/\$username = \"$NEW_DB_USER\";/" "$CONFIG_FILE"
-sed -i "s/\$password = .*/\$password = \"$NEW_DB_PASS\";/" "$CONFIG_FILE"
+sed -i "s/\$servername = .*/\$servername = \"127.0.0.1\";/" "$CONFIG_FILE"
+sed -i "s/\$username = .*/\$username = \"root\";/" "$CONFIG_FILE"
+sed -i "s/\$password = .*/\$password = \"vertrigo\";/" "$CONFIG_FILE"
 sed -i "s/\$provedor = .*/\$provedor = \"$PROVEDOR_NOME\";/" "$CONFIG_FILE"
 sed -i "s/\$site = .*/\$site = \"$PROVEDOR_SITE\";/" "$CONFIG_FILE"
 sed -i "s/\$token = .*/\$token = \"$API_TOKEN\";/" "$CONFIG_FILE"
@@ -342,14 +338,14 @@ chmod -R 755 "$INSTALL_DIR/db/" "$INSTALL_DIR/logs/"
 sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
 sed -i 's/ServerTokens OS/ServerTokens Prod/' /etc/apache2/conf-enabled/security.conf
 sed -i 's/ServerSignature On/ServerSignature Off/' /etc/apache2/conf-enabled/security.conf
+
+a2enmod rewrite
 systemctl restart apache2
 
 # 10. Instalar e Configurar Supervisor + Daemon + Rotação de Logs Mensal
 log "🤖 Configurando sistema de automação com Supervisor e Rotação Mensal..."
 
 # Criar diretório de logs e ajustar permissões
-rm -rf /var/log/mkmsg
-mkdir -p /var/log/mkmsg
 chown www-data:www-data /var/log/mkmsg
 
 # Configuração do Supervisor
@@ -359,9 +355,8 @@ command=/usr/bin/php /var/www/html/mkmsg/daemon.php
 directory=/var/www/html/mkmsg
 autostart=true
 autorestart=true
-startretries=3
-stderr_logfile=/var/log/mkmsg/daemon_error.log
-stdout_logfile=/var/log/mkmsg/daemon_output.log
+stderr_logfile=/var/log/mkmsg/mkmsg_error.log
+stdout_logfile=/var/log/mkmsg/mkmsg_output.log
 user=www-data
 environment=HOME="/var/www",USER="www-data"
 priority=999
@@ -369,7 +364,6 @@ stopwaitsecs=10
 SUPERVISOR_EOF
 
 # Configuração do Logrotate para gerar logs mensais
-# Isso criará arquivos como daemon_output.log.1.gz todo mês
 cat > /etc/logrotate.d/mkmsg << 'LOGROTATE_EOF'
 /var/log/mkmsg/*.log {
     monthly
@@ -409,6 +403,8 @@ log "MK-MSG:         http://$LOCAL_IP/mkmsg"
 log "Usuário:        $WEB_USER"
 log "Senha:          $WEB_PASS"
 log ""
+log "Token:          $API_TOKEN"
+log ""
 log "--------------------------------------------------------"
 log "💡 AUTOMAÇÃO:   O sistema usa um daemon que envia "
 log "                mensagens automaticas para os clientes "
@@ -417,8 +413,13 @@ log "                dos horários e dias ficam no portal web "
 log "                no botão Conf. geral "
 log ""
 log "AGENDADOR:"
-log "Status:         sudo supervisorctl status mkmsg"
+log "Status:         sudo supervisorctl status  mkmsg"
 log "Reiniciar:      sudo supervisorctl restart mkmsg"
+log ""
+log "TUNEL SSH:"
+log "Status:         sudo supervisorctl status  mkmsgtun"
+log "Reiniciar:      sudo supervisorctl restart mkmsgtun"
+log ""
 log "Logs:           sudo tail -n 10 /var/log/mkmsg/* "
 log "--------------------------------------------------------"
 log ""

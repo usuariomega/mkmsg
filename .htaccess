@@ -1,5 +1,23 @@
-AuthName "Acesso restrito, digite seu usuário e senha:"
 AuthType Basic
+AuthName "Acesso restrito, digite seu usuário e senha:"
 AuthUserFile /etc/apache2/.htpasswd
 Require valid-user
 
+Options -Indexes
+
+RewriteEngine On
+RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK|PUT|DELETE|OPTIONS) [NC]
+RewriteRule .* - [F]
+
+<IfModule mod_headers.c>
+    # Proteção contra Clickjacking
+    Header set X-Frame-Options "SAMEORIGIN"
+    # Proteção contra XSS no navegador
+    Header set X-XSS-Protection "1; mode=block"
+    # Impede o navegador de tentar adivinhar o tipo de conteúdo (MIME Sniffing)
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>
+
+<LimitExcept GET POST>
+    Require valid-user
+</LimitExcept>

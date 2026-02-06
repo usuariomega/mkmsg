@@ -87,6 +87,8 @@ if (isset($_POST['ajax_send']) || isset($_POST['get_all_ids'])) {
 }
 
 include 'header.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/mkmsg/install/version.php';
+
 
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
@@ -145,10 +147,13 @@ $result = $stmt->get_result();
 <div class="container">
     <div class="card mb-3">
         <h2 class="title-noprazo">📅 Títulos No Prazo</h2>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
         <p class="text-subtitle">
             Total de registros: <strong><?= $total_registros ?></strong> | Selecionados: <strong id="selected-count">0</strong>
             <button type="button" class="button3 btn-small" onclick="clearSelection()">Limpar Seleção</button>
         </p>
+        <span id="system-version" class="system-version-display" style="<?= $style ?>"><?= $text ?></span>
+        </div>
     </div>
 
     <div class="menu card mb-3">

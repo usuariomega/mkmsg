@@ -236,6 +236,13 @@ include 'config.php';
     .title-vencido { color: var(--danger); margin-bottom: 8px; }
     .title-pago { color: var(--success); margin-bottom: 8px; }
     .title-config { color: var(--tertiary); margin-bottom: 8px; }
+
+    .system-version-display {
+        margin-left: auto;
+        white-space: nowrap;
+        padding-left: 10px;
+    }
+
     .text-subtitle { color: var(--text-secondary); margin: 0; }
     
     /* Utilitários */
@@ -319,4 +326,3 @@ include 'config.php';
     </style>
 </head>
 <body>
-

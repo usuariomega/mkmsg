@@ -24,31 +24,6 @@ SCRIPT_WHATSAPP="$GITHUB_REPO/install_whatsapp_api_local.sh"
 TEMP_DIR=$(mktemp -d)
 trap "rm -rf $TEMP_DIR" EXIT
 
-# Função para validar se um IP é válido e privado
-validate_private_ip() {
-    local ip=$1
-    if ! [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "invalid_format"
-        return
-    fi
-    IFS='.' read -r octet1 octet2 octet3 octet4 <<< "$ip"
-    for octet in $octet1 $octet2 $octet3 $octet4; do
-        if ! [[ $octet =~ ^[0-9]+$ ]] || [ "$octet" -lt 0 ] || [ "$octet" -gt 255 ]; then
-            echo "invalid_format"
-            return
-        fi
-    done
-    
-    if [[ $ip =~ ^10\. ]] || \
-       [[ $ip =~ ^100\.(6[4-9]|7[0-9]|8[0-9]|9[0-9]|1[0-1][0-9]|12[0-7])\. ]] || \
-       [[ $ip =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || \
-       [[ $ip =~ ^192\.168\. ]]; then
-            echo "private"
-            return
-    fi
-    echo "public"
-}
-
 # 1. Verificações de Segurança e Ambiente
 if [ "$EUID" -ne 0 ]; then 
     error "Por favor, execute como root (use sudo)."
@@ -62,20 +37,9 @@ if grep -qi "devuan" /etc/os-release; then
     error "INSTALAÇÃO CANCELADA: Este sistema não pode ser instalado dentro do MK-Auth. Use o MK-MSG em uma máquina separada."
 fi
 
-LOCAL_IP=$(hostname -I | awk '{print $1}')
-ip_type=$(validate_private_ip "$LOCAL_IP")
-IS_PRIVATE=false
-
-if [[ "$ip_type" == "private" ]]; then
-    IS_PRIVATE=true
-fi
-
-if [ "$IS_PRIVATE" = false ]; then
-    error "FALHA DE SEGURANÇA: O servidor possui um IP público ($LOCAL_IP). Este sistema só permite instalação em rede local (IP Privado). Abortando."
-fi
+echo -e "\n"
 
 log "🚀 Bem-vindo ao Instalador MK-MSG!"
-log "IP Local Detectado: $LOCAL_IP"
 echo ""
 
 # 2. Menu de Seleção com Loop de Validação
@@ -143,11 +107,34 @@ case $CHOICE in
             echo ""
             
             # Tentar obter o token do config.php
+            # Detectar o usuário que chamou o script (se foi com sudo)
+            if [ -n "$SUDO_USER" ]; then
+                TARGET_USER="$SUDO_USER"
+                TARGET_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+            else
+                TARGET_USER=$(whoami)
+                TARGET_HOME=$HOME
+            fi
+            
+            APP_DIR="$TARGET_HOME/whatsapp-server"
             API_TOKEN=""
-            if [ -f "/var/www/html/mkmsg/config.php" ]; then
-                API_TOKEN=$(grep '\$token' /var/www/html/mkmsg/config.php | grep -oP '"\K[^"]+' | head -1)
-                if [ -n "$API_TOKEN" ]; then
-                    log "✅ Token obtido do config.php: $API_TOKEN"
+            
+            #Se ainda não tem token, tentar obter do arquivo de configuração do WhatsApp (se já existe)
+            if [ -z "$API_TOKEN" ]; then
+                if [ -f "$APP_DIR/config.js" ]; then
+                    API_TOKEN=$(grep 'API_TOKEN' "$APP_DIR/config.js" | grep -oP '"\K[^"]+' | head -1)
+                    if [ -n "$API_TOKEN" ]; then
+                        log "✅ Token obtido da instalação anterior: $API_TOKEN"
+                    fi
+                fi
+            fi
+            
+            if [ -z "$API_TOKEN" ]; then
+                if [ -f "/var/www/html/mkmsg/config.php" ]; then
+                    API_TOKEN=$(grep '\$token' /var/www/html/mkmsg/config.php | grep -oP '"\K[^"]+' | head -1)
+                    if [ -n "$API_TOKEN" ]; then
+                        log "✅ Token obtido do config.php: $API_TOKEN"
+                    fi
                 fi
             fi
             
@@ -176,7 +163,8 @@ case $CHOICE in
                     log "Você pode instalar depois com o token: $API_TOKEN"
                     log "Comando: curl -fsSL $SCRIPT_WHATSAPP | bash -s \"$API_TOKEN\""
                 else
-                    log "Você pode instalar depois executando: curl -fsSL $SCRIPT_WHATSAPP | bash"
+                    log "Você pode instalar depois executando: "
+                    log "curl -fsSL $SCRIPT_WHATSAPP | bash"
                 fi
             fi
         else
@@ -220,15 +208,38 @@ case $CHOICE in
         log "Você escolheu: Apenas API WhatsApp"
         log "Iniciando instalação da API WhatsApp..."
         echo ""
-        
-        # Tentar obter token do config.php local se existir
-        API_TOKEN=""
-        if [ -f "/var/www/html/mkmsg/config.php" ]; then
-            API_TOKEN=$(grep '\$token' /var/www/html/mkmsg/config.php | grep -oP '"\K[^"]+' | head -1)
-            if [ -n "$API_TOKEN" ]; then
-                log "✅ Token encontrado no config.php local: $API_TOKEN"
+
+            # Tentar obter o token do config.php
+            # Detectar o usuário que chamou o script (se foi com sudo)
+            if [ -n "$SUDO_USER" ]; then
+                TARGET_USER="$SUDO_USER"
+                TARGET_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+            else
+                TARGET_USER=$(whoami)
+                TARGET_HOME=$HOME
             fi
-        fi
+            
+            APP_DIR="$TARGET_HOME/whatsapp-server"
+            API_TOKEN=""
+            
+            #Se ainda não tem token, tentar obter do arquivo de configuração do WhatsApp (se já existe)
+            if [ -z "$API_TOKEN" ]; then
+                if [ -f "$APP_DIR/config.js" ]; then
+                    API_TOKEN=$(grep 'API_TOKEN' "$APP_DIR/config.js" | grep -oP '"\K[^"]+' | head -1)
+                    if [ -n "$API_TOKEN" ]; then
+                        log "✅ Token obtido da instalação anterior: $API_TOKEN"
+                    fi
+                fi
+            fi
+            
+            if [ -z "$API_TOKEN" ]; then
+                if [ -f "/var/www/html/mkmsg/config.php" ]; then
+                    API_TOKEN=$(grep '\$token' /var/www/html/mkmsg/config.php | grep -oP '"\K[^"]+' | head -1)
+                    if [ -n "$API_TOKEN" ]; then
+                        log "✅ Token obtido do config.php: $API_TOKEN"
+                    fi
+                fi
+            fi
         
         # Se não encontrou token local, perguntar ao usuário
         if [ -z "$API_TOKEN" ]; then
