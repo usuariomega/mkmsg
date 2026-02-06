@@ -115,4 +115,14 @@ Após o término do script, você receberá os links de acesso:
 
 ---
 
+## ⚠️ Informações Importantes 
+
+*   O sistema usa o **Nome Resumido** como campo de nome para enviar as mensagens. 
+*   O sistema usa o **Celular** para o envio (não confundir com o campo "Telefone").
+*   Use o o link `https://copiaecola.net/?pix=%copiacola%` para enviar links PIX clicáveis (copiar o PIX).
+*   Este sistema foi testado com **Efí Bank (Gerencianet)**, **Sicoob** e **Galaxpay**.   
+*   Poderá funcionar com outros bancos que usem as mesmas tabelas do banco de dados, porém não foi testado. 
+
+---
+
 ## 🤝 **Gostou do projeto? Deixe uma estrela no repositório!**
