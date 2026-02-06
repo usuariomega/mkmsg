@@ -139,11 +139,11 @@ if [[ "$REMOTE_RESULT" == *"RESTORED"* ]]; then
     echo -e "\n"
     warn "⚠️  O IP do banco de dados foi restaurado para o original do Mk-Auth (127.0.0.1)."
     warn "⚠️  Se você tem outra integração, ela poderá parar de funcionar."
-    warn "⚠️  Diga a seu consultor para usar tunel SSH!"
+    warn "⚠️  Diga a seu consultor para usar túnel SSH!"
     echo -e "\n"
 fi
 
-log "🔗 Configurando túnel SSH persistente com autossh..."
+log "🔗 Configurando túnel criptografado SSH persistente com autossh..."
 
 # Configuração do Supervisor para o autossh (Lado Cliente)
 # Criar diretório de logs e ajustar permissões
@@ -418,7 +418,7 @@ log "AGENDADOR:"
 log "Status:         sudo supervisorctl status  mkmsg"
 log "Reiniciar:      sudo supervisorctl restart mkmsg"
 log ""
-log "TUNEL SSH:"
+log "túnel SSH:"
 log "Status:         sudo supervisorctl status  mkmsgtun"
 log "Reiniciar:      sudo supervisorctl restart mkmsgtun"
 log ""

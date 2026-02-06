@@ -23,7 +23,8 @@ function getMySQLConnection($servername, $username, $password, $dbname) {
 function getClientsFromVtabTitulos($servername, $username, $password, $dbname) {
     $conn = getMySQLConnection($servername, $username, $password, $dbname);
     if (!$conn) return [];
-    $sql = "SELECT DISTINCT upper(nome_res) as nome_res, 
+    // CORREÇÃO: Selecionar o ID real do cliente (id) para evitar problemas de deslocamento
+    $sql = "SELECT id, upper(nome_res) as nome_res, 
             REGEXP_REPLACE(celular,'[( )-]+','') AS celular 
             FROM sis_cliente WHERE cli_ativado = 's' 
             AND nome_res IS NOT NULL AND TRIM(nome_res) <> '' 
@@ -33,9 +34,10 @@ function getClientsFromVtabTitulos($servername, $username, $password, $dbname) {
     $result = $conn->query($sql);
     $clients = [];
     if ($result && $result->num_rows > 0) {
-        $id = 1;
+                
         while ($row = $result->fetch_assoc()) {
-            $clients[] = ['id' => $id++, 'nome' => $row['nome_res'], 'celular' => $row['celular']];
+            // Usar id como identificador único
+            $clients[] = ['id' => $row['id'], 'nome' => $row['nome_res'], 'celular' => $row['celular']];
         }
     }
     $conn->close();
@@ -51,7 +53,13 @@ function generateUniqueFilename($name, $dir) {
 
 function saveList($name, $clients, $listsDir) {
     $filename = generateUniqueFilename($name, $listsDir);
-    file_put_contents($listsDir . '/' . $filename, json_encode(['name' => $name, 'clients' => $clients, 'createdAt' => date('Y-m-d H:i:s')]));
+    // Salvar apenas os IDs dos clientes para garantir que os dados sejam sempre os mais atuais do banco
+    $clientIds = array_map(function($c) { return $c['id']; }, $clients);
+    file_put_contents($listsDir . '/' . $filename, json_encode([
+        'name' => $name, 
+        'clientIds' => $clientIds, 
+        'createdAt' => date('Y-m-d H:i:s')
+    ]));
     return $filename;
 }
 
@@ -141,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             mkdir($dir, 0755, true);
             if (file_exists("$root/logs/.ler/modelo/index.php")) copy("$root/logs/.ler/modelo/index.php", "$dir/index.php");
         }
-        $logFile = "$dir/emmassa_" . date("d-M-Y") . ".log";
+        $logFile = "$dir/emmassa_" . date("d-m-Y") . ".log";
         file_put_contents($logFile, sprintf("%s;%s;%s;%s\n", date("d-m-Y"), date("H:i:s"), $nome, $allSuccess ? $response : $lastError), FILE_APPEND);
         
         echo json_encode(['success' => $allSuccess, 'nome' => $nome, 'response' => implode(' | ', $responses)]);
@@ -168,7 +176,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $filename = $_POST['filename'] ?? '';
         $filepath = $listsDir . '/' . basename($filename);
         if (file_exists($filepath)) {
-            echo json_encode(['success' => true, 'data' => json_decode(file_get_contents($filepath), true)]);
+            $listData = json_decode(file_get_contents($filepath), true);
+            // Se a lista for antiga (tiver 'clients' em vez de 'clientIds'), converter
+            if (isset($listData['clients']) && !isset($listData['clientIds'])) {
+                $listData['clientIds'] = array_map(function($c) { return $c['id']; }, $listData['clients']);
+            }
+            echo json_encode(['success' => true, 'data' => $listData]);
         } else {
             echo json_encode(['success' => false]);
         }
@@ -400,7 +413,7 @@ function updateRecipientCount() {
         selectedClients = allClients.map(c => c.id); 
     } else if (type === 'manual') { 
         selectedClients = []; 
-        $('.checkbox-item input[type="checkbox"]:checked').each(function() { selectedClients.push(parseInt($(this).val())); }); 
+        $('.checkbox-item input[type="checkbox"]:checked').each(function() { selectedClients.push($(this).val()); }); 
     } else if (type === 'list') {
         if (!$('#savedLists').val()) selectedClients = [];
     }
@@ -416,7 +429,10 @@ function saveCurrentList() {
     if (!name) return alert('Digite um nome');
     updateRecipientCount();
     if (selectedClients.length === 0) return alert('Selecione clientes para salvar a lista');
-    const clientsData = selectedClients.map(id => allClients.find(c => c.id === id)).filter(c => c);
+    
+    // CORREÇÃO: Enviar os dados completos dos clientes selecionados para salvar apenas os IDs no backend
+    const clientsData = selectedClients.map(id => allClients.find(c => c.id == id)).filter(c => c);
+    
     $.post('', { action: 'saveList', name, clients: JSON.stringify(clientsData) }, function(res) {
         if (res.success) { alert('Lista salva com sucesso!'); $('#newListName').val(''); $('#saveListModal').removeClass('active'); loadSavedLists(); }
         else { alert('Erro ao salvar a lista.'); }
@@ -431,7 +447,7 @@ function loadSavedLists() {
             res.files.forEach(file => {
                 const displayName = file.replace('.json', '').replace(/_/g, ' ');
                 options += `<option value="${file}">${displayName}</option>`;
-                container += `<div class="saved-item"><div class="saved-item-info"><div class="saved-item-name">${displayName}</div></div><div class="saved-item-actions"><button class="button button-small" onclick="loadList('${file}'); $('#loadListModal').removeClass('active')">Usar</button><button class="button button-danger button-small" onclick="deleteFile('${file}', 'lists')">Excluir</button></div></div>`;
+                container += `<div class="saved-item"><div class="saved-item-info"><div class="saved-item-name">${displayName}</div></div><div class="saved-item-actions"><button class="button button-small" onclick="loadList('${file}')">Carregar</button><button class="button button-danger button-small" onclick="deleteFile('${file}', 'lists')">Excluir</button></div></div>`;
             });
         }
         $('#savedLists').html(options); $('#savedListsContainer').html(container);
@@ -441,11 +457,22 @@ function loadSavedLists() {
 function loadList(filename) {
     $.post('', { action: 'loadList', filename }, function(res) {
         if (res.success) {
-            selectedClients = res.data.clients.map(c => c.id);
+            // CORREÇÃO: Filtrar apenas clientes que ainda existem e estão ativos no banco de dados
+            const clientIds = res.data.clientIds || [];
+            selectedClients = allClients.filter(c => clientIds.includes(c.id)).map(c => c.id);
+            
             $('#recipientCount').text(selectedClients.length);
             $('.checkbox-item input[type="checkbox"]').prop('checked', false);
             selectedClients.forEach(id => $(`#client_${id}`).prop('checked', true));
-            alert(`Lista "${res.data.name}" carregada com ${selectedClients.length} contatos.`);
+            
+            const missingCount = clientIds.length - selectedClients.length;
+            let msg = `Lista "${res.data.name}" carregada com ${selectedClients.length} contatos ativos.`;
+            if (missingCount > 0) msg += `\n\nNota: ${missingCount} cliente(s) da lista original não foram encontrados ou estão desativados e foram removidos automaticamente.`;
+            
+            alert(msg);
+            if ($('input[name="recipientType"]:checked').val() !== 'list') {
+                $('input[name="recipientType"][value="list"]').prop('checked', true).trigger('change');
+            }
         }
     });
 }
@@ -487,12 +514,16 @@ function deleteFile(filename, type) {
 
 async function sendMessages() {
     const message = $('#messageContent').val().trim();
+    updateRecipientCount(); // Garantir que a lista está atualizada
     if (selectedClients.length === 0) return alert('Selecione destinatários');
     if (!message) return alert('Digite uma mensagem');
     if (!confirm(`Enviar para ${selectedClients.length} cliente(s)?`)) return;
     isStopped = false;
     $('#overlay').css('display', 'flex'); $('#overlay-content').empty(); $('#btn-parar').show(); $('#btn-fechar').hide();
-    const clientsData = selectedClients.map(id => allClients.find(c => c.id === id)).filter(c => c);
+    
+    // CORREÇÃO: Mapear os IDs selecionados para os dados atuais dos clientes
+    const clientsData = selectedClients.map(id => allClients.find(c => c.id == id)).filter(c => c);
+    
     for (let i = 0; i < clientsData.length; i++) {
         if (isStopped) { $('#overlay-content').append('<br><b style="color:red;">⚠️ Interrompido.</b>'); break; }
         const contato = clientsData[i];
