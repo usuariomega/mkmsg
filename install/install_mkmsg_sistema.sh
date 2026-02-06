@@ -118,6 +118,8 @@ CURRENT_BIND=\$(grep '^bind-address' \"\$BIND_FILE\" | awk '{print \$3}')
 if [ \"\$CURRENT_BIND\" != \"127.0.0.1\" ]; then
     sed -i 's/bind-address.*/bind-address = 127.0.0.1/' \"\$BIND_FILE\"
     service mysql restart >/dev/null 2>&1
+    sleep 2
+    service freeradius restart >/dev/null 2>&1
     echo 'RESTORED'
 else
     echo 'OK'
