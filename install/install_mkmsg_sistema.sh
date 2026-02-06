@@ -155,7 +155,6 @@ if netstat -tuln | grep -q ":$DB_PORT "; then
             break
         fi
     done
-else
 fi
 
 log "🔗 Configurando túnel criptografado SSH persistente com autossh..."
