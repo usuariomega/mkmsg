@@ -113,7 +113,7 @@ while (true) {
         include($configFile);
         
         // Verificar se as variáveis de horário existem
-        if (!isset($horario_vencido) || !isset($horario_noprazo) || !isset($horario_pago)) {
+        if (!isset($horario_noprazo) || !isset($horario_pago) || !isset($horario_vencido) || !isset($horario_bloqueado)) {
             daemonLog("Variáveis de horário não configuradas. Aguardando...", "WARN");
             sleep(60);
             continue;
@@ -124,11 +124,6 @@ while (true) {
             limparLocksAntigos($lockDir);
         }
         
-        // Verificar e executar: VENCIDOS
-        if (estaNoHorario($horario_vencido) && !jaExecutouHoje('vencido', $lockDir)) {
-            executarEnvio('vencido', $root, $lockDir);
-        }
-        
         // Verificar e executar: NO PRAZO
         if (estaNoHorario($horario_noprazo) && !jaExecutouHoje('noprazo', $lockDir)) {
             executarEnvio('noprazo', $root, $lockDir);
@@ -137,6 +132,16 @@ while (true) {
         // Verificar e executar: PAGOS
         if (estaNoHorario($horario_pago) && !jaExecutouHoje('pago', $lockDir)) {
             executarEnvio('pago', $root, $lockDir);
+        }
+        
+        // Verificar e executar: VENCIDOS
+        if (estaNoHorario($horario_vencido) && !jaExecutouHoje('vencido', $lockDir)) {
+            executarEnvio('vencido', $root, $lockDir);
+        }
+        
+        // Verificar e executar: BLOQUEADOS
+        if (estaNoHorario($horario_bloqueado) && !jaExecutouHoje('bloqueado', $lockDir)) {
+            executarEnvio('bloqueado', $root, $lockDir);
         }
         
         // Aguardar 60 segundos antes da próxima verificação

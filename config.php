@@ -50,9 +50,10 @@ $diaspago = [1];
 
 //Horários de envio automático (formato HH:MM)
 //O daemon verifica a cada minuto se chegou a hora de enviar
-$horario_vencido = "08:00";
 $horario_noprazo = "09:00";
 $horario_pago = "10:00";
+$horario_vencido = "08:00";
+$horario_bloqueado = "08:30";
 
 //Tempo de pausa de envio entre os clientes
 //Tempo mínimo = 30 segundos, máximmo = 120 segundos
@@ -60,6 +61,9 @@ $horario_pago = "10:00";
 $tempomin = 10;
 $tempomax = 90;
 
+// Ignorar envios em finais de semana e feriados?
+// 0 = Não, 1 = Sim
+$ignorar_fds_feriado = 1;
 
 //Não mexa abaixo!!
 //Consulta SQL para buscar os clientes no prazo (interface manual)

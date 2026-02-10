@@ -194,6 +194,7 @@
                     <a href="../noprazo" class="<?= getBtnClass('noprazo', $current_dir) ?>">No Prazo</a>
                     <a href="../pago" class="<?= getBtnClass('pago', $current_dir) ?>">Pagos</a>
                     <a href="../vencido" class="<?= getBtnClass('vencido', $current_dir) ?>">Vencidos</a>
+                    <a href="../bloqueado" class="<?= getBtnClass('bloqueado', $current_dir) ?>">Bloqueados</a>
                     <a href="../emmassa" class="<?= getBtnClass('emmassa', $current_dir) ?>">Em massa</a>
                     <a href="../../" class="button3">Voltar</a>
                 </div>

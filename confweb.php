@@ -29,6 +29,9 @@ function readConfig($file) {
         preg_match('/\$tempomax\s*=\s*(\d+)/', $content, $matches);
         $config['tempomax'] = $matches[1] ?? '120';
         
+        preg_match('/\$ignorar_fds_feriado\s*=\s*(\d+)/', $content, $matches);
+        $config['ignorar_fds_feriado'] = $matches[1] ?? '0';
+        
         // Extrair arrays de dias
         preg_match('/\$diasnoprazo\s*=\s*\[(.*?)\]/', $content, $matches);
         $config['diasnoprazo'] = $matches[1] ?? '3';
@@ -40,14 +43,17 @@ function readConfig($file) {
         $config['diaspago'] = $matches[1] ?? '3';
         
         // Extrair horários
-        preg_match('/\$horario_vencido\s*=\s*"([^"]+)"/', $content, $matches);
-        $config['horario_vencido'] = $matches[1] ?? '09:00';
-        
         preg_match('/\$horario_noprazo\s*=\s*"([^"]+)"/', $content, $matches);
-        $config['horario_noprazo'] = $matches[1] ?? '10:00';
+        $config['horario_noprazo'] = $matches[1] ?? '09:00';
         
         preg_match('/\$horario_pago\s*=\s*"([^"]+)"/', $content, $matches);
-        $config['horario_pago'] = $matches[1] ?? '11:00';
+        $config['horario_pago'] = $matches[1] ?? '10:00';
+
+        preg_match('/\$horario_vencido\s*=\s*"([^"]+)"/', $content, $matches);
+        $config['horario_vencido'] = $matches[1] ?? '08:00';
+
+        preg_match('/\$horario_bloqueado\s*=\s*"([^"]+)"/', $content, $matches);
+        $config['horario_bloqueado'] = $matches[1] ?? '08:30';
     }
     return $config;
 }
@@ -63,6 +69,7 @@ function saveConfig($file, $data) {
     $template = preg_replace('/\$token\s*=\s*"[^"]*"/', '$token = "' . addslashes($data['token']) . '"', $template);
     $template = preg_replace('/\$tempomin\s*=\s*\d+/', '$tempomin = ' . (int)$data['tempomin'], $template);
     $template = preg_replace('/\$tempomax\s*=\s*\d+/', '$tempomax = ' . (int)$data['tempomax'], $template);
+    $template = preg_replace('/\$ignorar_fds_feriado\s*=\s*\d+/', '$ignorar_fds_feriado = ' . (isset($data['ignorar_fds_feriado']) ? 1 : 0), $template);
     
     // Atualizar arrays de dias
     $diasnoprazo = array_map('intval', array_filter(array_map('trim', explode(',', $data['diasnoprazo']))));
@@ -74,9 +81,10 @@ function saveConfig($file, $data) {
     $template = preg_replace('/\$diaspago\s*=\s*\[.*?\]/', '$diaspago = [' . implode(', ', $diaspago) . ']', $template);
     
     // Atualizar horários
-    $template = preg_replace('/\$horario_vencido\s*=\s*"([^"]+)"/', '$horario_vencido = "' . addslashes($data['horario_vencido']) . '"', $template);
     $template = preg_replace('/\$horario_noprazo\s*=\s*"([^"]+)"/', '$horario_noprazo = "' . addslashes($data['horario_noprazo']) . '"', $template);
     $template = preg_replace('/\$horario_pago\s*=\s*"([^"]+)"/', '$horario_pago = "' . addslashes($data['horario_pago']) . '"', $template);
+    $template = preg_replace('/\$horario_vencido\s*=\s*"([^"]+)"/', '$horario_vencido = "' . addslashes($data['horario_vencido']) . '"', $template);
+    $template = preg_replace('/\$horario_bloqueado\s*=\s*"([^"]+)"/', '$horario_bloqueado = "' . addslashes($data['horario_bloqueado']) . '"', $template);
     
     return file_put_contents($file, $template) !== false;
 }
@@ -227,6 +235,30 @@ $config = readConfig($configFile);
             </div>
         </div>
 
+        <!-- SEÇÃO: CONDIÇÕES DE ENVIO -->
+        <div class="card mb-3">
+            <h3 style="color: var(--tertiary); margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--border);">
+                🛡️ Condições de Envio
+            </h3>
+            
+            <div style="display: flex; align-items: center; gap: 15px; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
+                <div style="position: relative; display: inline-block; width: 60px; height: 34px;">
+                    <input type="checkbox" name="ignorar_fds_feriado" id="ignorar_fds_feriado" <?= $config['ignorar_fds_feriado'] == '1' ? 'checked' : '' ?> style="opacity: 0; width: 0; height: 0;" onchange="updateToggleStyle(this)">
+                    <label for="ignorar_fds_feriado" id="toggle-label" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: <?= $config['ignorar_fds_feriado'] == '1' ? 'var(--primary)' : '#ccc' ?>; transition: .4s; border-radius: 34px;">
+                        <span id="toggle-span" style="position: absolute; content: ''; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; transform: <?= $config['ignorar_fds_feriado'] == '1' ? 'translateX(26px)' : 'translateX(0)' ?>;"></span>
+                    </label>
+                </div>
+                <div>
+                    <label for="ignorar_fds_feriado" style="font-weight: 600; color: var(--text-primary); cursor: pointer; display: block;">
+                        Evitar envios em Finais de Semana e Feriados
+                    </label>
+                    <small style="color: var(--text-secondary);">
+                        Se ativado, as mensagens que cairiam em sábado, domingo ou feriado serão ajustadas para o dia útil mais próximo (antecipado ou postergado).
+                    </small>
+                </div>
+            </div>
+        </div>
+
         <!-- SEÇÃO: HORÁRIOS DE ENVIO -->
         <div class="card mb-3">
             <h3 style="color: var(--secondary); margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--border);">
@@ -246,15 +278,21 @@ $config = readConfig($configFile);
                 </div>
                 <div>
                     <label class="form-label">
+                        ✅ Horário "Pago"
+                    </label>
+                    <input type="time" name="horario_pago" value="<?= htmlspecialchars($config['horario_pago']) ?>" class="form-input-full">
+                </div>
+                <div>
+                    <label class="form-label">
                         ⚠️ Horário "Vencido"
                     </label>
                     <input type="time" name="horario_vencido" value="<?= htmlspecialchars($config['horario_vencido']) ?>" class="form-input-full">
                 </div>
                 <div>
                     <label class="form-label">
-                        ✅ Horário "Pago"
+                        🚫 Horário "Bloqueado"
                     </label>
-                    <input type="time" name="horario_pago" value="<?= htmlspecialchars($config['horario_pago']) ?>" class="form-input-full">
+                    <input type="time" name="horario_bloqueado" value="<?= htmlspecialchars($config['horario_bloqueado']) ?>" class="form-input-full">
                 </div>
             </div>
         </div>
@@ -266,24 +304,37 @@ $config = readConfig($configFile);
             </h3>
             
             <p class="text-subtitle mb-3" style="font-size: 14px; color: var(--text-primary);">
-                Simule quando uma notificação será enviada com base na data do título e nos dias configurados para automação.
+                Escolha o cenário abaixo para simular a data de envio.
             </p>
             
             <div class="grid-2">
                 <div>
-                    <label class="form-label">Tipo de Título</label>
+                    <label class="form-label">Cenário de Simulação</label>
                     <select id="sim_tipo" class="form-input-full" onchange="simular()">
-                        <option value="noprazo">📅 No Prazo (Antes do Vencimento)</option>
-                        <option value="vencido">⚠️ Vencido (Após o Vencimento)</option>
-                        <option value="pago">✅ Pago (Após o Pagamento)</option>
+                        <optgroup label="📅 NO PRAZO">
+                            <option value="noprazo_normal">No Prazo (Todos os dias)</option>
+                            <option value="noprazo_util">No Prazo (Apenas dias úteis)</option>
+                        </optgroup>
+                        <optgroup label="⚠️ VENCIDO">
+                            <option value="vencido_normal">Vencido (Todos os dias)</option>
+                            <option value="vencido_util">Vencido (Apenas dias úteis)</option>
+                        </optgroup>
+                        <optgroup label="✅ PAGO">
+                            <option value="pago_normal">Pago (Todos os dias)</option>
+                            <option value="pago_util">Pago (Apenas dias úteis)</option>
+                        </optgroup>
+                        <optgroup label="🚫 BLOQUEADO">
+                            <option value="bloqueado_normal">Bloqueado (Todos os dias)</option>
+                            <option value="bloqueado_util">Bloqueado (Apenas dias úteis)</option>
+                        </optgroup>
                     </select>
                 </div>
                 <div>
-                    <label class="form-label">Data do Evento (Vencimento ou Pagamento)</label>
+                    <label class="form-label" id="label_sim_data">Data do Evento (Vencimento)</label>
                     <input type="date" id="sim_data" class="form-input-full" onchange="simular()" style="height: 48px; padding: 12px 16px; border: 2px solid var(--border); border-radius: var(--radius-md);">
                 </div>
                 <div>
-                    <label class="form-label">Dias para Notificar (ex: 3, 7)</label>
+                    <label class="form-label" id="label_sim_dias">Dias para Notificar (ex: 1, 3, 7)</label>
                     <input type="text" id="sim_dias" class="form-input-full" placeholder="Ex: 1, 5, 10" oninput="simular()">
                 </div>
                 <div id="sim_resultado_container" style="display: flex; align-items: flex-end;">
@@ -312,6 +363,7 @@ $config = readConfig($configFile);
         </h4>
         <ul style="color: var(--text-secondary); margin-left: 20px; line-height: 1.8;">
             <li><strong>Dias de Envio:</strong> Separe os dias por vírgula. Exemplo: "1, 10" enviará mensagens 1 e 10 dias antes/após o vencimento.</li>
+            <li><strong>Dias para o Bloqueio:</strong> O bloqueio vai ler o dia vencido somado ao dia de corte. (De acordo com o valor no financeiro do cliente).</li>
             <li><strong>Tempos de Pausa:</strong> O sistema aguardará um tempo aleatório entre o mínimo e máximo configurado antes de enviar cada mensagem.</li>
             <li><strong>Horários:</strong> O daemon verifica a cada minuto. Se for 09:00 e o horário configurado for 09:00, o envio será processado.</li>
         </ul>
@@ -319,8 +371,92 @@ $config = readConfig($configFile);
 </div>
 
 <script>
+function updateToggleStyle(checkbox) {
+    const label = document.getElementById('toggle-label');
+    const span = document.getElementById('toggle-span');
+    if (checkbox.checked) {
+        label.style.backgroundColor = 'var(--primary)';
+        span.style.transform = 'translateX(26px)';
+    } else {
+        label.style.backgroundColor = '#ccc';
+        span.style.transform = 'translateX(0)';
+    }
+}
+
+// Função para calcular feriados móveis
+function getFeriados(ano) {
+    const feriados = [
+        `${ano}-01-01`, // Confraternização Universal
+        `${ano}-04-21`, // Tiradentes
+        `${ano}-05-01`, // Dia do Trabalho
+        `${ano}-09-07`, // Independência do Brasil
+        `${ano}-10-12`, // Nossa Senhora Aparecida
+        `${ano}-11-02`, // Finados
+        `${ano}-11-15`, // Proclamação da República
+        `${ano}-11-20`, // Dia da Consciência Negra
+        `${ano}-12-25`, // Natal
+    ];
+
+    // Cálculo da Páscoa (Algoritmo de Meeus/Jones/Butcher)
+    const a = ano % 19;
+    const b = Math.floor(ano / 100);
+    const c = ano % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const mes = Math.floor((h + l - 7 * m + 114) / 31);
+    const dia = ((h + l - 7 * m + 114) % 31) + 1;
+    
+    const pascoa = new Date(ano, mes - 1, dia);
+    
+    const format = (d) => d.toISOString().split('T')[0];
+    
+    const carnaval = new Date(pascoa);
+    carnaval.setDate(pascoa.getDate() - 47);
+    
+    const sextaSanta = new Date(pascoa);
+    sextaSanta.setDate(pascoa.getDate() - 2);
+    
+    const corpusChristi = new Date(pascoa);
+    corpusChristi.setDate(pascoa.getDate() + 60);
+    
+    feriados.push(format(carnaval), format(sextaSanta), format(corpusChristi));
+    return feriados;
+}
+
+function isDiaUtil(data, feriados) {
+    const diaSemana = data.getDay(); // 0 = Domingo, 6 = Sábado
+    if (diaSemana === 0 || diaSemana === 6) return false;
+    
+    const dataStr = data.toISOString().split('T')[0];
+    return !feriados.includes(dataStr);
+}
+
 function simular() {
-    const tipo = document.getElementById('sim_tipo').value;
+    const cenario = document.getElementById('sim_tipo').value;
+    const labelDias = document.getElementById('label_sim_dias');
+    const labelData = document.getElementById('label_sim_data');
+    
+    // Ajuste dinâmico do rótulo de dias
+    if (cenario.startsWith('bloqueado')) {
+        labelDias.innerText = 'Dias para o corte (ex: 3)';
+    } else {
+        labelDias.innerText = 'Dias para Notificar (ex: 1, 3, 7)';
+    }
+
+    // Ajuste dinâmico do rótulo de data
+    if (cenario.startsWith('pago')) {
+        labelData.innerText = 'Data do Evento (Pagamento)';
+    } else {
+        labelData.innerText = 'Data do Evento (Vencimento)';
+    }
+
     const dataStr = document.getElementById('sim_data').value;
     const diasStr = document.getElementById('sim_dias').value;
     const resultadoDiv = document.getElementById('sim_resultado');
@@ -331,6 +467,7 @@ function simular() {
     }
 
     const dataBase = new Date(dataStr + 'T00:00:00');
+    const feriados = getFeriados(dataBase.getFullYear());
     const dias = diasStr.split(',').map(d => parseInt(d.trim())).filter(d => !isNaN(d));
     
     if (dias.length === 0) {
@@ -338,20 +475,64 @@ function simular() {
         return;
     }
 
-    let html = '<div style="font-weight: 600; margin-bottom: 5px;">Datas de Notificação:</div>';
+    const [tipo, modo] = cenario.split('_');
+    const isUtil = (modo === 'util');
+
+    let html = `<div style="font-weight: 600; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px; color: var(--primary);">Resultado da Simulação (${isUtil ? 'Dias Úteis' : 'Todos os dias'}):</div>`;
     
     dias.forEach(d => {
         let dataSimulada = new Date(dataBase);
         if (tipo === 'noprazo') {
-            // No prazo: subtrai os dias do vencimento
             dataSimulada.setDate(dataBase.getDate() - d);
         } else {
-            // Vencido ou Pago: soma os dias ao evento
+            // Vencido, Pago e Bloqueado somam dias
             dataSimulada.setDate(dataBase.getDate() + d);
         }
         
+        let statusMsg = "";
+        let corStatus = "var(--text-secondary)";
+
+        if (isUtil) {
+            if (!isDiaUtil(dataSimulada, feriados)) {
+                let diasAjustados = 0;
+                if (tipo === 'noprazo') {
+                    // Antecipa
+                    while (!isDiaUtil(dataSimulada, feriados)) {
+                        dataSimulada.setDate(dataSimulada.getDate() - 1);
+                        diasAjustados++;
+                    }
+                    // Regra especial Segunda-feira
+                    if (d === 1 && dataBase.getDay() === 1) {
+                        dataSimulada = new Date(dataBase);
+                        statusMsg = " (Mesmo dia, Segunda-feira)";
+                    } else {
+                        statusMsg = ` (Antecipado ${diasAjustados}d)`;
+                    }
+                } else {
+                    // Posterga (Vencido, Pago, Bloqueado)
+                    while (!isDiaUtil(dataSimulada, feriados)) {
+                        dataSimulada.setDate(dataSimulada.getDate() + 1);
+                        diasAjustados++;
+                    }
+                    statusMsg = ` (Postergado ${diasAjustados}d)`;
+                }
+                corStatus = "var(--danger)";
+            }
+        }
+
         const dataFormatada = dataSimulada.toLocaleDateString('pt-BR');
-        html += `<div>• ${d} dia(s) ${tipo === 'noprazo' ? 'antes' : 'depois'}: <b>${dataFormatada}</b></div>`;
+        const diaSemanaNome = dataSimulada.toLocaleDateString('pt-BR', { weekday: 'long' });
+        
+        let labelDias = "";
+        if (tipo === 'noprazo') labelDias = `${d} dia(s) antes`;
+        else if (tipo === 'bloqueado') labelDias = `Bloqueio (${d} dias após)`;
+        else labelDias = `${d} dia(s) depois`;
+
+        html += `<div style="margin-bottom: 8px; line-height: 1.4;">
+                    <span style="font-size: 12px; color: #888;">${labelDias}:</span><br>
+                    <b>${dataFormatada}</b> (${diaSemanaNome})
+                    <span style="color: ${corStatus}; font-size: 11px; font-weight: bold;">${statusMsg}</span>
+                 </div>`;
     });
 
     resultadoDiv.innerHTML = html;
@@ -359,6 +540,7 @@ function simular() {
 
 // Inicializar com a data de hoje para facilitar
 document.getElementById('sim_data').valueAsDate = new Date();
+simular();
 </script>
 
 </body>
