@@ -44,7 +44,7 @@ Defina o conteúdo exato das mensagens que serão enviadas para cada situação 
 
 #### Configuração de Mensagens
 *Interface intuitiva para edição das mensagens, com pré-visualização em tempo real do WhatsApp.*
-<img width="1420" height="2375" alt="confmsg" src="https://github.com/user-attachments/assets/d584db69-b0ee-4f6d-8363-4d05a84169cf" />
+<img width="1115" height="2441" alt="confmsg" src="https://github.com/user-attachments/assets/c8771868-2685-462e-9f08-46b4dcfb3037" />
 <br><br>
 
 
@@ -54,14 +54,15 @@ Gerencie a conexão com a API do WhatsApp e configure os parâmetros globais de 
 
 #### Configurações Gerais
 *Ajuste os tempos de pausa entre envios, os dias específicos para disparo de cada tipo de mensagem e os horários de execução do *daemon*.*
-<img width="1420" height="2837" alt="confgeral" src="https://github.com/user-attachments/assets/080832a5-149c-4758-b302-d738a343eecd" />
+<img width="1115" height="2494" alt="confgeral" src="https://github.com/user-attachments/assets/39c7d83a-f439-44a2-90b9-99c5f2af4fbb" />
 <br><br>
 
 
 
 #### Dashboard da API WhatsApp
 *Conecte seu número de WhatsApp de forma segura via QR Code e monitore o status da conexão e a fila de envio.*
-<img width="1585" height="962" alt="whatsappapi" src="https://github.com/user-attachments/assets/7e0147fe-267f-4d32-abdb-ab47dd526c7c" /><br><br>
+<img width="1132" height="919" alt="whatsapp" src="https://github.com/user-attachments/assets/e75e60a9-fab6-45f2-8870-afa68938e178" />
+<br><br>
 
 
 ---
@@ -77,7 +78,7 @@ Gerencie a conexão com a API do WhatsApp e configure os parâmetros globais de 
 
 ## 🛠️ Pré-requisitos
 
-*   Servidor com **Ubuntu, Debian ou Linux Mint** (IP Privado/Rede Local).
+*   Servidor com **Ubuntu 24 ou Debian 13**.
 *   Acesso SSH ao seu servidor **MK-Auth**.
 *   Conexão com a Internet.
 
@@ -91,7 +92,7 @@ Gerencie a conexão com a API do WhatsApp e configure os parâmetros globais de 
 ```bash
 curl -O https://raw.githubusercontent.com/usuariomega/mkmsg/main/install/install_mkmsg.sh
 chmod +x install_mkmsg.sh
-sudo ./install_mkmsg.sh
+./install_mkmsg.sh
 ```
 
 ### 📝 O que o instalador fará por você:
@@ -100,7 +101,7 @@ sudo ./install_mkmsg.sh
 *   Configurará o acesso remoto ao banco de dados do seu **MK-Auth** via SSH.
 *   Gerará um **Token de Segurança** exclusivo de 20 caracteres.
 *   Instalará e configurará a **API do WhatsApp** localmente.
-*   Configurará o agendamento automático de mensagens (opcional).
+*   Configurará o agendamento automático de mensagens.
 
 ---
 
