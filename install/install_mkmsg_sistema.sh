@@ -363,6 +363,7 @@ sed -i 's/ServerTokens OS/ServerTokens Prod/' /etc/apache2/conf-enabled/security
 sed -i 's/ServerSignature On/ServerSignature Off/' /etc/apache2/conf-enabled/security.conf
 
 a2enmod rewrite >/dev/null 2>&1
+/usr/sbin/a2enmod rewrite >/dev/null 2>&1
 systemctl restart apache2 >/dev/null 2>&1
 
 # 10. Instalar e Configurar Supervisor + Daemon + Rotação de Logs Mensal
