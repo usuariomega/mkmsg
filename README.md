@@ -44,7 +44,7 @@ Defina o conteúdo exato das mensagens que serão enviadas para cada situação 
 
 #### Configuração de Mensagens
 *Interface intuitiva para edição das mensagens, com pré-visualização em tempo real do WhatsApp.*
-<img width="1115" height="2441" alt="confmsg" src="https://github.com/user-attachments/assets/c8771868-2685-462e-9f08-46b4dcfb3037" />
+<img width="1420" height="3048" alt="confmsg" src="https://github.com/user-attachments/assets/f2b23a6e-abc9-488e-beb2-a3f3919e51cb" />
 <br><br>
 
 
@@ -54,14 +54,14 @@ Gerencie a conexão com a API do WhatsApp e configure os parâmetros globais de 
 
 #### Configurações Gerais
 *Ajuste os tempos de pausa entre envios, os dias específicos para disparo de cada tipo de mensagem e os horários de execução do *daemon*.*
-<img width="1115" height="2494" alt="confgeral" src="https://github.com/user-attachments/assets/39c7d83a-f439-44a2-90b9-99c5f2af4fbb" />
+<img width="1420" height="3143" alt="confgeral" src="https://github.com/user-attachments/assets/b19da320-c60c-4ceb-a43c-58efb0b6857d" />
 <br><br>
 
 
 
 #### Dashboard da API WhatsApp
 *Conecte seu número de WhatsApp de forma segura via QR Code e monitore o status da conexão e a fila de envio.*
-<img width="1132" height="919" alt="whatsapp" src="https://github.com/user-attachments/assets/e75e60a9-fab6-45f2-8870-afa68938e178" />
+<img width="1420" height="973" alt="whatsapp" src="https://github.com/user-attachments/assets/cd2fa987-f9d6-4ab1-bee2-e4a0e4606243" />
 <br><br>
 
 
@@ -84,7 +84,7 @@ Gerencie a conexão com a API do WhatsApp e configure os parâmetros globais de 
 
 ---
 
-## 🚀 Como Instalar (Rápido e Fácil)
+## 🚀 Como Instalar
 
 1.  Acesse o terminal do seu servidor (VM onde ficará o MK-MSG).
 2.  Execute o comando abaixo:
