@@ -4,6 +4,7 @@ if (php_sapi_name() !== 'cli') {
 }
 
 include 'config.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/mkmsg/install/version.php';
 
 if (!is_array($diasnoprazo)) $diasnoprazo = [$diasnoprazo];
 

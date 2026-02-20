@@ -44,15 +44,27 @@ function getClientsFromVtabTitulos($servername, $username, $password, $dbname, $
     return $clients;
 }
 
-function generateUniqueFilename($name, $dir) {
-    $safeName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $name);
-    $counter = 1;
-    while (file_exists($dir . '/' . $safeName . '_' . $counter . '.json')) { $counter++; }
-    return $safeName . '_' . $counter . '.json';
+function sanitizeFilename($name) {
+    return preg_replace('/[^a-zA-Z0-9_-]/', '_', $name);
 }
 
-function saveList($name, $clients, $listsDir) {
-    $filename = generateUniqueFilename($name, $listsDir);
+function getFilenameFromName($name, $dir) {
+    $safeName = sanitizeFilename($name);
+    return $safeName . '.json';
+}
+
+function fileExists($name, $dir) {
+    $filename = getFilenameFromName($name, $dir);
+    return file_exists($dir . '/' . $filename);
+}
+
+function saveList($name, $clients, $listsDir, $isEdit = false) {
+    // Validar se o nome já existe (apenas ao criar, não ao editar)
+    if (!$isEdit && fileExists($name, $listsDir)) {
+        return ['success' => false, 'error' => 'Uma lista com este nome já existe'];
+    }
+    
+    $filename = getFilenameFromName($name, $listsDir);
     // Salvar apenas os IDs dos clientes para garantir que os dados sejam sempre os mais atuais do banco
     $clientIds = array_map(function($c) { return $c['id']; }, $clients);
     file_put_contents($listsDir . '/' . $filename, json_encode([
@@ -60,13 +72,18 @@ function saveList($name, $clients, $listsDir) {
         'clientIds' => $clientIds, 
         'createdAt' => date('Y-m-d H:i:s')
     ]));
-    return $filename;
+    return ['success' => true, 'filename' => $filename];
 }
 
-function saveMessage($name, $content, $messagesDir) {
-    $filename = generateUniqueFilename($name, $messagesDir);
+function saveMessage($name, $content, $messagesDir, $isEdit = false) {
+    // Validar se o nome já existe (apenas ao criar, não ao editar)
+    if (!$isEdit && fileExists($name, $messagesDir)) {
+        return ['success' => false, 'error' => 'Uma mensagem com este nome já existe'];
+    }
+    
+    $filename = getFilenameFromName($name, $messagesDir);
     file_put_contents($messagesDir . '/' . $filename, json_encode(['name' => $name, 'content' => $content, 'createdAt' => date('Y-m-d H:i:s')]));
-    return $filename;
+    return ['success' => true, 'filename' => $filename];
 }
 
 function listFiles($dir) {
@@ -83,6 +100,7 @@ function listFiles($dir) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     // Carregar config.php para ter acesso às variáveis de banco, API, provedor e site
     include 'config.php';
+    include $_SERVER['DOCUMENT_ROOT'] . '/mkmsg/install/version.php';
     
     $action = $_POST['action'];
     header('Content-Type: application/json');
@@ -159,16 +177,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($action === 'saveList') {
         $name = $_POST['name'] ?? 'Lista sem nome';
         $clients = json_decode($_POST['clients'] ?? '[]', true);
-        $filename = saveList($name, $clients, $listsDir);
-        echo json_encode(['success' => true, 'filename' => $filename]);
+        $isEdit = isset($_POST['isEdit']) && $_POST['isEdit'] === 'true';
+        $result = saveList($name, $clients, $listsDir, $isEdit);
+        echo json_encode($result);
         exit;
     }
     
     if ($action === 'saveMessage') {
         $name = $_POST['name'] ?? 'Mensagem sem nome';
         $content = $_POST['content'] ?? '';
-        $filename = saveMessage($name, $content, $messagesDir);
-        echo json_encode(['success' => true, 'filename' => $filename]);
+        $isEdit = isset($_POST['isEdit']) && $_POST['isEdit'] === 'true';
+        $result = saveMessage($name, $content, $messagesDir, $isEdit);
+        echo json_encode($result);
+        exit;
+    }
+    
+    if ($action === 'editList') {
+        $oldFilename = $_POST['oldFilename'] ?? '';
+        $name = $_POST['name'] ?? 'Lista sem nome';
+        $clients = json_decode($_POST['clients'] ?? '[]', true);
+        $oldFilepath = $listsDir . '/' . basename($oldFilename);
+        if ($oldFilename && file_exists($oldFilepath)) {
+            unlink($oldFilepath);
+        }
+        $result = saveList($name, $clients, $listsDir, true);
+        echo json_encode($result);
         exit;
     }
     
@@ -185,6 +218,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } else {
             echo json_encode(['success' => false]);
         }
+        exit;
+    }
+    
+    if ($action === 'editMessage') {
+        $oldFilename = $_POST['oldFilename'] ?? '';
+        $name = $_POST['name'] ?? 'Mensagem sem nome';
+        $content = $_POST['content'] ?? '';
+        $oldFilepath = $messagesDir . '/' . basename($oldFilename);
+        if ($oldFilename && file_exists($oldFilepath)) {
+            unlink($oldFilepath);
+        }
+        $result = saveMessage($name, $content, $messagesDir, true);
+        echo json_encode($result);
         exit;
     }
     
@@ -349,7 +395,9 @@ $tMax = isset($tempomax) ? (int)$tempomax : 90;
 <div id="loadListModal" class="modal"><div class="modal-content" style="max-width: 600px;"><div class="modal-header">Gerenciar Listas Salvas</div><div id="savedListsContainer" class="saved-items"></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#loadListModal').removeClass('active')">Fechar</button></div></div></div>
 <div id="saveMessageModal" class="modal"><div class="modal-content"><div class="modal-header">Salvar Modelo de Mensagem</div><div class="modal-body"><label class="form-label">Nome do Modelo</label><input type="text" id="newMessageName" class="form-input-full" placeholder="Ex: Aviso de Vencimento"></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#saveMessageModal').removeClass('active')">Cancelar</button><button type="button" class="button" onclick="saveCurrentMessage()">Salvar</button></div></div></div>
 <div id="loadMessageModal" class="modal"><div class="modal-content" style="max-width: 600px;"><div class="modal-header">Modelos de Mensagem</div><div id="savedMessagesContainer" class="saved-items"></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#loadMessageModal').removeClass('active')">Fechar</button></div></div></div>
+<div id="editListModal" class="modal"><div class="modal-content"><div class="modal-header">Editar Lista de Contatos</div><div class="modal-body"><label class="form-label">Nome da Lista</label><input type="text" id="editListName" class="form-input-full" placeholder="Ex: Clientes Vencidos Jan"><div id="editListClientsContainer" style="margin-top: 16px; max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px;"></div></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#editListModal').removeClass('active')">Cancelar</button><button type="button" class="button" onclick="saveEditedList()">Salvar Alteracoes</button></div></div></div>
 
+<div id="editMessageModal" class="modal"><div class="modal-content"><div class="modal-header">Editar Modelo de Mensagem</div><div class="modal-body"><label class="form-label">Nome do Modelo</label><input type="text" id="editMessageName" class="form-input-full" placeholder="Ex: Aviso de Vencimento"><label class="form-label" style="margin-top: 16px;">Conteudo</label><textarea id="editMessageContent" class="form-input-full" style="min-height: 180px; font-family: 'Courier New', Courier, monospace; font-size: 14px;"></textarea></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#editMessageModal').removeClass('active')">Cancelar</button><button type="button" class="button" onclick="saveEditedMessage()">Salvar Alteracoes</button></div></div></div>
 <div id="overlay" class="modal">
     <div class="modal-content" style="max-width: 600px;">
         <div class="modal-header">Status do Envio em Massa</div>
@@ -433,9 +481,9 @@ function saveCurrentList() {
     // CORREÇÃO: Enviar os dados completos dos clientes selecionados para salvar apenas os IDs no backend
     const clientsData = selectedClients.map(id => allClients.find(c => c.id == id)).filter(c => c);
     
-    $.post('', { action: 'saveList', name, clients: JSON.stringify(clientsData) }, function(res) {
+    $.post('', { action: 'saveList', name, clients: JSON.stringify(clientsData), isEdit: 'false' }, function(res) {
         if (res.success) { alert('Lista salva com sucesso!'); $('#newListName').val(''); $('#saveListModal').removeClass('active'); loadSavedLists(); }
-        else { alert('Erro ao salvar a lista.'); }
+        else { alert(res.error || 'Erro ao salvar a lista.'); }
     });
 }
 
@@ -447,7 +495,7 @@ function loadSavedLists() {
             res.files.forEach(file => {
                 const displayName = file.replace('.json', '').replace(/_/g, ' ');
                 options += `<option value="${file}">${displayName}</option>`;
-                container += `<div class="saved-item"><div class="saved-item-info"><div class="saved-item-name">${displayName}</div></div><div class="saved-item-actions"><button class="button button-small" onclick="loadList('${file}')">Carregar</button><button class="button button-danger button-small" onclick="deleteFile('${file}', 'lists')">Excluir</button></div></div>`;
+                container += `<div class="saved-item"><div class="saved-item-info"><div class="saved-item-name">${displayName}</div></div><div class="saved-item-actions"><button class="button button-small" onclick="loadList('${file}')">Carregar</button><button class="button button-small" onclick="editList('${file}')">Editar</button><button class="button button-danger button-small" onclick="deleteFile('${file}', 'lists')">Excluir</button></div></div>`;
             });
         }
         $('#savedLists').html(options); $('#savedListsContainer').html(container);
@@ -480,8 +528,9 @@ function loadList(filename) {
 function openSaveMessageModal() { if (!$('#messageContent').val()) return alert('Digite uma mensagem'); $('#saveMessageModal').addClass('active'); }
 function saveCurrentMessage() {
     const name = $('#newMessageName').val();
-    $.post('', { action: 'saveMessage', name, content: $('#messageContent').val() }, function(res) {
+    $.post('', { action: 'saveMessage', name, content: $('#messageContent').val(), isEdit: 'false' }, function(res) {
         if (res.success) { alert('Mensagem salva!'); $('#saveMessageModal').removeClass('active'); loadSavedMessages(); }
+        else { alert(res.error || 'Erro ao salvar a mensagem.'); }
     });
 }
 
@@ -491,7 +540,7 @@ function loadSavedMessages() {
         if (res && res.files && Array.isArray(res.files)) {
             res.files.forEach(file => {
                 const displayName = file.replace('.json', '').replace(/_/g, ' ');
-                container += `<div class="saved-item"><div class="saved-item-info"><div class="saved-item-name">${displayName}</div></div><div class="saved-item-actions"><button class="button button-small" onclick="loadMessage('${file}')">Carregar</button><button class="button button-danger button-small" onclick="deleteFile('${file}', 'messages')">Excluir</button></div></div>`;
+                container += `<div class="saved-item"><div class="saved-item-info"><div class="saved-item-name">${displayName}</div></div><div class="saved-item-actions"><button class="button button-small" onclick="loadMessage('${file}')">Carregar</button><button class="button button-small" onclick="editMessage('${file}')">Editar</button><button class="button button-danger button-small" onclick="deleteFile('${file}', 'messages')">Excluir</button></div></div>`;
             });
         }
         $('#savedMessagesContainer').html(container);
@@ -550,6 +599,68 @@ async function sendMessages() {
 function stopSending() { isStopped = true; $('#btn-parar').prop('disabled', true).text('Parando...'); }
 function openLoadListModal() { $('#loadListModal').addClass('active'); }
 function openLoadMessageModal() { $('#loadMessageModal').addClass('active'); }
+
+// Variaveis globais para edicao
+let currentEditListFilename = '';
+let currentEditMessageFilename = '';
+
+// Funcao para abrir modal de edicao de lista
+function editList(filename) {
+    $.post('', { action: 'loadList', filename }, function(res) {
+        if (res.success) {
+            currentEditListFilename = filename;
+            const data = res.data;
+            $('#editListName').val(data.name);
+            let clientsHtml = '';
+            const clientIds = data.clientIds || [];
+            allClients.forEach(client => {
+                const isChecked = clientIds.includes(client.id) ? 'checked' : '';
+                clientsHtml += `<div class="checkbox-item"><input type="checkbox" id="edit_client_${client.id}" value="${client.id}" ${isChecked} class="check"><label for="edit_client_${client.id}"><strong>${client.nome}</strong> - ${client.celular}</label></div>`;
+            });
+            $('#editListClientsContainer').html(clientsHtml);
+            $('#editListModal').addClass('active');
+        }
+    });
+}
+
+function saveEditedList() {
+    const name = $('#editListName').val();
+    if (!name) return alert('Digite um nome');
+    const editedClients = [];
+    $('#editListClientsContainer input[type="checkbox"]:checked').each(function() {
+        const id = $(this).val();
+        const client = allClients.find(c => c.id == id);
+        if (client) editedClients.push(client);
+    });
+    if (editedClients.length === 0) return alert('Selecione clientes para salvar a lista');
+    $.post('', { action: 'editList', oldFilename: currentEditListFilename, name, clients: JSON.stringify(editedClients), isEdit: 'true' }, function(res) {
+        if (res.success) { alert('Lista atualizada com sucesso!'); $('#editListModal').removeClass('active'); loadSavedLists(); }
+        else { alert(res.error || 'Erro ao atualizar a lista.'); }
+    });
+}
+
+function editMessage(filename) {
+    $.post('', { action: 'loadMessage', filename }, function(res) {
+        if (res.success) {
+            currentEditMessageFilename = filename;
+            const data = res.data;
+            $('#editMessageName').val(data.name);
+            $('#editMessageContent').val(data.content);
+            $('#editMessageModal').addClass('active');
+        }
+    });
+}
+
+function saveEditedMessage() {
+    const name = $('#editMessageName').val();
+    const content = $('#editMessageContent').val();
+    if (!name) return alert('Digite um nome');
+    if (!content) return alert('Digite o conteudo da mensagem');
+    $.post('', { action: 'editMessage', oldFilename: currentEditMessageFilename, name, content, isEdit: 'true' }, function(res) {
+        if (res.success) { alert('Mensagem atualizada com sucesso!'); $('#editMessageModal').removeClass('active'); loadSavedMessages(); }
+        else { alert(res.error || 'Erro ao atualizar a mensagem.'); }
+    });
+}
 </script>
 </body>
 </html>
