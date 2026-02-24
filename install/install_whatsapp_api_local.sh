@@ -513,6 +513,11 @@ echo file_get_contents(\$api_url, false, \$context);
 EOF
 chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/public/exemplo.html"
 
+
+#Correção temporária
+sed -i 's/proto.ClientPayload.UserAgent.Platform.WEB/proto.ClientPayload.UserAgent.Platform.MACOS/' $APP_DIR/node_modules/@whiskeysockets/baileys/lib/Utils/validate-connection.js
+
+
 # 12. Iniciar com PM2 e configurar Startup
 log "🚀 Iniciando a API com PM2..."
 su - "$TARGET_USER" -c "cd $APP_DIR && pm2 start index.js --name $APP_NAME --silent"
