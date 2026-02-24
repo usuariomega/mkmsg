@@ -3,6 +3,7 @@
 $dataDir = __DIR__ . '/db/emmassa';
 $listsDir = $dataDir . '/lists';
 $messagesDir = $dataDir . '/messages';
+$importedClientsFile = $dataDir . '/imported_clients.json';
 
 // Criar diretórios se não existirem
 if (!is_dir($listsDir)) mkdir($listsDir, 0755, true);
@@ -23,7 +24,6 @@ function getMySQLConnection($servername, $username, $password, $dbname, $port) {
 function getClientsFromVtabTitulos($servername, $username, $password, $dbname, $port) {
     $conn = getMySQLConnection($servername, $username, $password, $dbname, $port);
     if (!$conn) return [];
-    // CORREÇÃO: Selecionar o ID real do cliente (id) para evitar problemas de deslocamento
     $sql = "SELECT id, upper(nome_res) as nome_res, 
             REGEXP_REPLACE(celular,'[( )-]+','') AS celular 
             FROM sis_cliente WHERE cli_ativado = 's' 
@@ -34,14 +34,28 @@ function getClientsFromVtabTitulos($servername, $username, $password, $dbname, $
     $result = $conn->query($sql);
     $clients = [];
     if ($result && $result->num_rows > 0) {
-                
         while ($row = $result->fetch_assoc()) {
-            // Usar id como identificador único
-            $clients[] = ['id' => $row['id'], 'nome' => $row['nome_res'], 'celular' => $row['celular']];
+            $clients[] = [
+                'id' => 'mk_' . $row['id'], 
+                'nome' => $row['nome_res'], 
+                'celular' => $row['celular'],
+                'origem' => 'mk'
+            ];
         }
     }
     $conn->close();
     return $clients;
+}
+
+function getImportedClients($file) {
+    if (file_exists($file)) {
+        return json_decode(file_get_contents($file), true) ?: [];
+    }
+    return [];
+}
+
+function saveImportedClients($file, $clients) {
+    file_put_contents($file, json_encode($clients));
 }
 
 function sanitizeFilename($name) {
@@ -59,13 +73,10 @@ function fileExists($name, $dir) {
 }
 
 function saveList($name, $clients, $listsDir, $isEdit = false) {
-    // Validar se o nome já existe (apenas ao criar, não ao editar)
     if (!$isEdit && fileExists($name, $listsDir)) {
         return ['success' => false, 'error' => 'Uma lista com este nome já existe'];
     }
-    
     $filename = getFilenameFromName($name, $listsDir);
-    // Salvar apenas os IDs dos clientes para garantir que os dados sejam sempre os mais atuais do banco
     $clientIds = array_map(function($c) { return $c['id']; }, $clients);
     file_put_contents($listsDir . '/' . $filename, json_encode([
         'name' => $name, 
@@ -76,11 +87,9 @@ function saveList($name, $clients, $listsDir, $isEdit = false) {
 }
 
 function saveMessage($name, $content, $messagesDir, $isEdit = false) {
-    // Validar se o nome já existe (apenas ao criar, não ao editar)
     if (!$isEdit && fileExists($name, $messagesDir)) {
         return ['success' => false, 'error' => 'Uma mensagem com este nome já existe'];
     }
-    
     $filename = getFilenameFromName($name, $messagesDir);
     file_put_contents($messagesDir . '/' . $filename, json_encode(['name' => $name, 'content' => $content, 'createdAt' => date('Y-m-d H:i:s')]));
     return ['success' => true, 'filename' => $filename];
@@ -98,10 +107,7 @@ function listFiles($dir) {
 
 // Processar requisições AJAX ANTES de qualquer saída (header.php)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    // Carregar config.php para ter acesso às variáveis de banco, API, provedor e site
     include 'config.php';
-    include $_SERVER['DOCUMENT_ROOT'] . '/mkmsg/install/version.php';
-    
     $action = $_POST['action'];
     header('Content-Type: application/json');
 
@@ -111,8 +117,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $nome = $contato['nome'] ?? 'N/A';
         $celular = $contato['celular'] ?? '';
         $firstName = explode(' ', $nome)[0];
-        
-        // CORREÇÃO: Dividir a mensagem por ## para enviar múltiplos balões
         $baloes = explode('##', $message);
         $responses = [];
         $allSuccess = true;
@@ -121,14 +125,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         foreach ($baloes as $balao) {
             $balao = trim($balao);
             if (empty($balao)) continue;
-
-            // Substituição de variáveis por balão
             $msgFinal = str_replace(
                 ['%nomeresumido%', '%celular%', '%provedor%', '%site%', '%0A'], 
                 [$firstName, $celular, $provedor ?? '', $site ?? '', "\n"], 
                 $balao
             );
-            
             $payload = ["numero" => "55" . $celular, "mensagem" => $msgFinal];
             $ch = curl_init("http://$wsip:8000/send");
             curl_setopt_array($ch, [
@@ -141,25 +142,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $response = curl_exec($ch);
             $error = curl_error($ch);
             curl_close($ch);
-
             $apiSuccess = false;
             if (!$error) {
                 $resData = json_decode($response, true);
                 $apiSuccess = (isset($resData['status']) && ($resData['status'] === 'sent' || $resData['status'] === true)) || isset($resData['key']);
             }
-
             if (!$apiSuccess) {
                 $allSuccess = false;
                 $lastError = $error ?: $response;
             }
-            
             $responses[] = $error ?: $response;
-            
-            // Pequena pausa entre balões para evitar problemas na API
-            usleep(500000); // 0.5 segundos
+            usleep(500000);
         }
         
-        // Log (apenas o resultado final)
         $month = date("Y-m");
         $root = $_SERVER["DOCUMENT_ROOT"] . "/mkmsg";
         $dir = "$root/logs/$month/emmassa";
@@ -169,7 +164,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         $logFile = "$dir/emmassa_" . date("d-m-Y") . ".log";
         file_put_contents($logFile, sprintf("%s;%s;%s;%s\n", date("d-m-Y"), date("H:i:s"), $nome, $allSuccess ? $response : $lastError), FILE_APPEND);
-        
         echo json_encode(['success' => $allSuccess, 'nome' => $nome, 'response' => implode(' | ', $responses)]);
         exit;
     }
@@ -197,9 +191,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $name = $_POST['name'] ?? 'Lista sem nome';
         $clients = json_decode($_POST['clients'] ?? '[]', true);
         $oldFilepath = $listsDir . '/' . basename($oldFilename);
-        if ($oldFilename && file_exists($oldFilepath)) {
-            unlink($oldFilepath);
-        }
+        if ($oldFilename && file_exists($oldFilepath)) unlink($oldFilepath);
         $result = saveList($name, $clients, $listsDir, true);
         echo json_encode($result);
         exit;
@@ -210,7 +202,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $filepath = $listsDir . '/' . basename($filename);
         if (file_exists($filepath)) {
             $listData = json_decode(file_get_contents($filepath), true);
-            // Se a lista for antiga (tiver 'clients' em vez de 'clientIds'), converter
             if (isset($listData['clients']) && !isset($listData['clientIds'])) {
                 $listData['clientIds'] = array_map(function($c) { return $c['id']; }, $listData['clients']);
             }
@@ -226,9 +217,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $name = $_POST['name'] ?? 'Mensagem sem nome';
         $content = $_POST['content'] ?? '';
         $oldFilepath = $messagesDir . '/' . basename($oldFilename);
-        if ($oldFilename && file_exists($oldFilepath)) {
-            unlink($oldFilepath);
-        }
+        if ($oldFilename && file_exists($oldFilepath)) unlink($oldFilepath);
         $result = saveMessage($name, $content, $messagesDir, true);
         echo json_encode($result);
         exit;
@@ -265,14 +254,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         exit;
     }
+
+    if ($action === 'importClients') {
+        $newClients = json_decode($_POST['clients'] ?? '[]', true);
+        $currentImported = getImportedClients($importedClientsFile);
+        
+        foreach ($newClients as $nc) {
+            $nc['id'] = 'imp_' . time() . '_' . rand(1000, 9999);
+            $nc['origem'] = 'imp';
+            $currentImported[] = $nc;
+        }
+        
+        saveImportedClients($importedClientsFile, $currentImported);
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    if ($action === 'clearImported') {
+        if (file_exists($importedClientsFile)) unlink($importedClientsFile);
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    if ($action === 'deleteImportedClients') {
+        $clientIds = json_decode($_POST['clientIds'] ?? '[]', true);
+        $currentImported = getImportedClients($importedClientsFile);
+        $updated = array_filter($currentImported, function($client) use ($clientIds) {
+            return !in_array($client['id'], $clientIds);
+        });
+        if (count($updated) > 0) {
+            saveImportedClients($importedClientsFile, array_values($updated));
+        } else {
+            if (file_exists($importedClientsFile)) unlink($importedClientsFile);
+        }
+        echo json_encode(['success' => true]);
+        exit;
+    }
 }
 
-// Se não for AJAX, carregar a página normalmente
 include 'config.php';
 include 'header.php';
-$clients = getClientsFromVtabTitulos($servername, $username, $password, $dbname, $port);
+include $_SERVER['DOCUMENT_ROOT'] . '/mkmsg/install/version.php';
+$mkClients = getClientsFromVtabTitulos($servername, $username, $password, $dbname, $port);
+$impClients = getImportedClients($importedClientsFile);
+$allClients = array_merge($mkClients, $impClients);
 
-// Garantir que as variáveis de tempo existam (fallback caso não estejam no config.php)
 $tMin = isset($tempomin) ? (int)$tempomin : 10;
 $tMax = isset($tempomax) ? (int)$tempomax : 90;
 ?>
@@ -290,8 +316,7 @@ $tMax = isset($tempomax) ? (int)$tempomax : 90;
     .modal-header { font-size: 18px; font-weight: 700; margin-bottom: 16px; color: var(--tertiary); border-bottom: 1px solid var(--border-light); padding-bottom: 10px; }
     .modal-footer { display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; }
     .saved-items { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; }
-    .saved-item { background: var(--bg-light); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; display: flex; justify-content: space-between; align-items: center; transition: var(--transition); }
-    .saved-item:hover { border-color: var(--primary); background: var(--bg-white); }
+    .saved-item { display: flex; align-items: center; padding: 12px; background: var(--bg-light); border-radius: var(--radius-sm); border: 1px solid var(--border); }
     .saved-item-info { flex: 1; }
     .saved-item-name { font-weight: 600; font-size: 14px; color: var(--text-primary); }
     .saved-item-actions { display: flex; gap: 8px; }
@@ -299,6 +324,8 @@ $tMax = isset($tempomax) ? (int)$tempomax : 90;
     .msg-section textarea { width: 100%; min-height: 180px; font-family: 'Courier New', Courier, monospace; font-size: 14px; line-height: 1.6; resize: vertical; margin-bottom: 12px; }
     .whatsapp-bubble { background: #fff; padding: 10px 14px; border-radius: 8px; position: relative; max-width: 85%; font-size: 14px; line-height: 1.5; box-shadow: 0 1px 2px rgba(0,0,0,0.15); margin-bottom: 8px; word-wrap: break-word; white-space: pre-wrap; display: table; width: auto; min-width: 50px; }
     .whatsapp-bubble::before { content: ""; position: absolute; width: 0; height: 0; border-top: 10px solid transparent; border-bottom: 10px solid transparent; border-right: 10px solid #fff; left: -10px; top: 0; }
+    .badge-mk { background: #28a745; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-right: 8px; font-weight: bold; }
+    .badge-imp { background: #007bff; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-right: 8px; font-weight: bold; }
 </style>
 
 <div class="container">
@@ -307,7 +334,6 @@ $tMax = isset($tempomax) ? (int)$tempomax : 90;
         <p class="text-subtitle">Envie mensagens para todos os clientes ou selecione uma lista específica.</p>
     </div>
 
-<!-- Menu de Navegação -->
     <div class="menu card mb-3">
         <div style="display: flex; gap: 12px; flex-wrap: wrap;">
             <button class="button3" onclick="location.href='index.php'" type="button">📅 No prazo</button>
@@ -325,7 +351,7 @@ $tMax = isset($tempomax) ? (int)$tempomax : 90;
             <div style="margin-bottom: 16px;">
                 <label class="form-label">Opções de Envio</label>
                 <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="radio" name="recipientType" value="all" checked class="check" style="width: 20px; height: 20px;"><span>Todos os clientes (<?php echo count($clients); ?>)</span></label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="radio" name="recipientType" value="all" checked class="check" style="width: 20px; height: 20px;"><span>Todos os clientes (<?php echo count($allClients); ?>)</span></label>
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="radio" name="recipientType" value="list" class="check" style="width: 20px; height: 20px;"><span>Selecionar lista salva</span></label>
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="radio" name="recipientType" value="manual" class="check" style="width: 20px; height: 20px;"><span>Seleção manual</span></label>
                 </div>
@@ -347,15 +373,28 @@ $tMax = isset($tempomax) ? (int)$tempomax : 90;
                         <button type="button" class="button3 btn-small" onclick="deselectAllClients()">Nenhum</button>
                     </div>
                 </div>
+                <div style="margin-bottom: 12px;">
+                    <input type="text" id="searchManual" class="form-input-full" placeholder="🔍 Pesquisar por nome ou celular..." onkeyup="filterClients('manual')">
+                </div>
                 <div id="clientsList" class="checkbox-list">
-                    <?php foreach ($clients as $client): ?>
+                    <?php foreach ($allClients as $client): ?>
                         <div class="checkbox-item">
                             <input type="checkbox" id="client_<?php echo $client['id']; ?>" value="<?php echo $client['id']; ?>" onchange="updateRecipientCount()" class="check">
-                            <label for="client_<?php echo $client['id']; ?>"><strong><?php echo $client['nome']; ?></strong> - <?php echo $client['celular']; ?></label>
+                            <label for="client_<?php echo $client['id']; ?>">
+                                <span class="badge-<?php echo $client['origem']; ?>"><?php echo strtoupper($client['origem']); ?></span>
+                                <strong><?php echo $client['nome']; ?></strong> - <?php echo $client['celular']; ?>
+                            </label>
                         </div>
                     <?php endforeach; ?>
                 </div>
-                <div class="mt-3"><button type="button" class="button button-small" onclick="openSaveListModal()">💾 Salvar como Lista</button></div>
+                <div class="mt-3" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button type="button" class="button button-small" onclick="openSaveListModal()">💾 Salvar como Lista</button>
+                    <button type="button" class="button button-small" onclick="openImportModal()" style="background-color: #00b32b;">📥 Importar Contatos</button>
+                    <?php if (count($impClients) > 0): ?>
+                        <button type="button" class="button button-danger button-small" onclick="deleteSelectedImported()" style="background-color: #dc3545;">🗑️ Excluir Selecionados</button>
+                        <button type="button" class="button button-danger button-small" onclick="clearAllImported()" style="background-color: #dc3545;">🗑️ Limpar Todos</button>
+                    <?php endif; ?>
+                </div>
             </div>
 
             <div class="recipients-summary">Destinatários selecionados: <span id="recipientCount">0</span></div>
@@ -391,13 +430,34 @@ $tMax = isset($tempomax) ? (int)$tempomax : 90;
 </div>
 
 <!-- Modais -->
+<div id="importModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">Importar Contatos Externos</div>
+        <div class="modal-body">
+            <div style="margin-bottom: 20px;">
+                <label class="form-label">Opção 1: Upload de VCF</label>
+                <input type="file" id="vcfFile" accept=".vcf" class="form-input-full" style="padding: 8px;">
+                <small style="color: #666;">Importe arquivos VCF do Google Contatos, Outlook ou celular.</small>
+            </div>
+            <div style="border-top: 1px solid #eee; padding-top: 15px;">
+                <label class="form-label">Opção 2: Entrada Manual</label>
+                <textarea id="manualImport" class="form-input-full" style="min-height: 100px; font-size: 13px;" placeholder="Nome;Celular (um por linha)"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="button3" onclick="$('#importModal').removeClass('active')">Cancelar</button>
+            <button type="button" class="button" onclick="processImport()">Importar</button>
+        </div>
+    </div>
+</div>
+
 <div id="saveListModal" class="modal"><div class="modal-content"><div class="modal-header">Salvar Lista de Contatos</div><div class="modal-body"><label class="form-label">Nome da Lista</label><input type="text" id="newListName" class="form-input-full" placeholder="Ex: Clientes Vencidos Jan"></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#saveListModal').removeClass('active')">Cancelar</button><button type="button" class="button" onclick="saveCurrentList()">Salvar</button></div></div></div>
 <div id="loadListModal" class="modal"><div class="modal-content" style="max-width: 600px;"><div class="modal-header">Gerenciar Listas Salvas</div><div id="savedListsContainer" class="saved-items"></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#loadListModal').removeClass('active')">Fechar</button></div></div></div>
 <div id="saveMessageModal" class="modal"><div class="modal-content"><div class="modal-header">Salvar Modelo de Mensagem</div><div class="modal-body"><label class="form-label">Nome do Modelo</label><input type="text" id="newMessageName" class="form-input-full" placeholder="Ex: Aviso de Vencimento"></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#saveMessageModal').removeClass('active')">Cancelar</button><button type="button" class="button" onclick="saveCurrentMessage()">Salvar</button></div></div></div>
 <div id="loadMessageModal" class="modal"><div class="modal-content" style="max-width: 600px;"><div class="modal-header">Modelos de Mensagem</div><div id="savedMessagesContainer" class="saved-items"></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#loadMessageModal').removeClass('active')">Fechar</button></div></div></div>
-<div id="editListModal" class="modal"><div class="modal-content"><div class="modal-header">Editar Lista de Contatos</div><div class="modal-body"><label class="form-label">Nome da Lista</label><input type="text" id="editListName" class="form-input-full" placeholder="Ex: Clientes Vencidos Jan"><div id="editListClientsContainer" style="margin-top: 16px; max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px;"></div></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#editListModal').removeClass('active')">Cancelar</button><button type="button" class="button" onclick="saveEditedList()">Salvar Alteracoes</button></div></div></div>
-
+<div id="editListModal" class="modal"><div class="modal-content"><div class="modal-header">Editar Lista de Contatos</div><div class="modal-body"><label class="form-label">Nome da Lista</label><input type="text" id="editListName" class="form-input-full" placeholder="Ex: Clientes Vencidos Jan"><div style="margin-top: 16px; margin-bottom: 12px;"><input type="text" id="searchEdit" class="form-input-full" placeholder="🔍 Pesquisar por nome ou celular..." onkeyup="filterClients('edit')"></div><div id="editListClientsContainer" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px;"></div></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#editListModal').removeClass('active')">Cancelar</button><button type="button" class="button" onclick="saveEditedList()">Salvar Alteracoes</button></div></div></div>
 <div id="editMessageModal" class="modal"><div class="modal-content"><div class="modal-header">Editar Modelo de Mensagem</div><div class="modal-body"><label class="form-label">Nome do Modelo</label><input type="text" id="editMessageName" class="form-input-full" placeholder="Ex: Aviso de Vencimento"><label class="form-label" style="margin-top: 16px;">Conteudo</label><textarea id="editMessageContent" class="form-input-full" style="min-height: 180px; font-family: 'Courier New', Courier, monospace; font-size: 14px;"></textarea></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#editMessageModal').removeClass('active')">Cancelar</button><button type="button" class="button" onclick="saveEditedMessage()">Salvar Alteracoes</button></div></div></div>
+
 <div id="overlay" class="modal">
     <div class="modal-content" style="max-width: 600px;">
         <div class="modal-header">Status do Envio em Massa</div>
@@ -411,15 +471,12 @@ $tMax = isset($tempomax) ? (int)$tempomax : 90;
 </div>
 
 <script>
-let allClients = <?php echo json_encode($clients); ?>;
+let allClients = <?php echo json_encode($allClients); ?>;
 let selectedClients = [];
 let isStopped = false;
 
-// Passando as variáveis do PHP para o JavaScript para a pré-visualização
 const PROVEDOR_NOME = "<?php echo $provedor ?? 'PROVEDOR'; ?>";
 const PROVEDOR_SITE = "<?php echo $site ?? 'www.site.com.br'; ?>";
-
-// Tempos de pausa vindos do config.php (convertidos para milissegundos)
 const TEMPO_MIN = <?php echo $tMin * 1000; ?>;
 const TEMPO_MAX = <?php echo $tMax * 1000; ?>;
 
@@ -439,11 +496,7 @@ $(document).ready(function() {
 function updatePreview() {
     const input = $('#messageContent').val();
     const previewContainer = $('#preview');
-    const mockData = { 
-        '%nomeresumido%': '<b>João</b>', 
-        '%provedor%': `<b>${PROVEDOR_NOME}</b>`, 
-        '%site%': `<b>${PROVEDOR_SITE}</b>` 
-    };
+    const mockData = { '%nomeresumido%': '<b>João</b>', '%provedor%': `<b>${PROVEDOR_NOME}</b>`, '%site%': `<b>${PROVEDOR_SITE}</b>` };
     previewContainer.empty();
     if (!input.trim()) { previewContainer.html('<span style="color: #999;">Sua pré-visualização aparecerá aqui...</span>'); return; }
     input.split('##').forEach(text => {
@@ -470,19 +523,118 @@ function updateRecipientCount() {
 
 function selectAllClients() { $('.checkbox-item input[type="checkbox"]').prop('checked', true); updateRecipientCount(); }
 function deselectAllClients() { $('.checkbox-item input[type="checkbox"]').prop('checked', false); updateRecipientCount(); }
+
+function filterClients(type) {
+    const searchValue = (type === 'manual' ? $('#searchManual').val() : $('#searchEdit').val()).toLowerCase();
+    const container = type === 'manual' ? '#clientsList' : '#editListClientsContainer';
+    $(container + ' .checkbox-item').each(function() {
+        const text = $(this).text().toLowerCase();
+        $(this).toggle(text.includes(searchValue));
+    });
+}
+
+function openImportModal() { $('#importModal').addClass('active'); }
+
+function processImport() {
+    const manual = $('#manualImport').val().trim();
+    const file = $('#vcfFile')[0].files[0];
+    let clientsToImport = [];
+
+    if (manual) {
+        manual.split('\n').forEach(line => {
+            const parts = line.split(';');
+            if (parts.length >= 2) {
+                clientsToImport.push({ nome: parts[0].trim().toUpperCase(), celular: parts[1].trim().replace(/\D/g, '') });
+            }
+        });
+    }
+
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const text = e.target.result;
+            const contacts = parseVCF(text);
+            clientsToImport = clientsToImport.concat(contacts);
+            sendImportRequest(clientsToImport);
+        };
+        reader.readAsText(file);
+    } else if (clientsToImport.length > 0) {
+        sendImportRequest(clientsToImport);
+    } else {
+        alert('Selecione um arquivo ou digite contatos manualmente.');
+    }
+}
+
+function parseVCF(vcfText) {
+    const contacts = [];
+    const vCards = vcfText.split('BEGIN:VCARD');
+    vCards.forEach(vCard => {
+        if (!vCard.includes('END:VCARD')) return;
+        let nome = '';
+        let celular = '';
+        const lines = vCard.split('\n');
+        lines.forEach(line => {
+            line = line.trim();
+            if (line.startsWith('FN:')) {
+                nome = line.substring(3).trim().toUpperCase();
+            }
+            if (line.startsWith('TEL')) {
+                const match = line.match(/:(.*)$/);
+                if (match) {
+                    const phone = match[1].trim().replace(/\D/g, '');
+                    if (phone && !celular) celular = phone;
+                }
+            }
+        });
+        if (nome && celular) {
+            contacts.push({ nome: nome, celular: celular });
+        }
+    });
+    return contacts;
+}
+
+function sendImportRequest(clients) {
+    $.post('', { action: 'importClients', clients: JSON.stringify(clients) }, function(res) {
+        if (res.success) { alert('Contatos importados!'); location.reload(); }
+    });
+}
+
+function deleteSelectedImported() {
+    const selectedImported = [];
+    $('.checkbox-item input[type="checkbox"]:checked').each(function() {
+        const id = $(this).val();
+        const client = allClients.find(c => c.id == id);
+        if (client && client.origem === 'imp') {
+            selectedImported.push(id);
+        }
+    });
+    
+    if (selectedImported.length === 0) {
+        return alert('Selecione apenas contatos importados para excluir.');
+    }
+    
+    if (confirm(`Excluir ${selectedImported.length} contato(s) importado(s) selecionado(s)?`)) {
+        $.post('', { action: 'deleteImportedClients', clientIds: JSON.stringify(selectedImported) }, function(res) {
+            if (res.success) location.reload();
+        });
+    }
+}
+
+function clearAllImported() {
+    if (confirm('Deseja remover TODOS os contatos importados?')) {
+        $.post('', { action: 'clearImported' }, function(res) { if (res.success) location.reload(); });
+    }
+}
+
 function openSaveListModal() { if (selectedClients.length === 0) return alert('Selecione clientes primeiro'); $('#saveListModal').addClass('active'); }
 
 function saveCurrentList() {
     const name = $('#newListName').val();
     if (!name) return alert('Digite um nome');
     updateRecipientCount();
-    if (selectedClients.length === 0) return alert('Selecione clientes para salvar a lista');
-    
-    // CORREÇÃO: Enviar os dados completos dos clientes selecionados para salvar apenas os IDs no backend
     const clientsData = selectedClients.map(id => allClients.find(c => c.id == id)).filter(c => c);
-    
     $.post('', { action: 'saveList', name, clients: JSON.stringify(clientsData), isEdit: 'false' }, function(res) {
-        if (res.success) { alert('Lista salva com sucesso!'); $('#newListName').val(''); $('#saveListModal').removeClass('active'); loadSavedLists(); }
+        if (res.success) { alert('Lista salva com sucesso!'); location.reload(); }
         else { alert(res.error || 'Erro ao salvar a lista.'); }
     });
 }
@@ -505,19 +657,11 @@ function loadSavedLists() {
 function loadList(filename) {
     $.post('', { action: 'loadList', filename }, function(res) {
         if (res.success) {
-            // CORREÇÃO: Filtrar apenas clientes que ainda existem e estão ativos no banco de dados
             const clientIds = res.data.clientIds || [];
             selectedClients = allClients.filter(c => clientIds.includes(c.id)).map(c => c.id);
-            
             $('#recipientCount').text(selectedClients.length);
             $('.checkbox-item input[type="checkbox"]').prop('checked', false);
             selectedClients.forEach(id => $(`#client_${id}`).prop('checked', true));
-            
-            const missingCount = clientIds.length - selectedClients.length;
-            let msg = `Lista "${res.data.name}" carregada com ${selectedClients.length} contatos ativos.`;
-            if (missingCount > 0) msg += `\n\nNota: ${missingCount} cliente(s) da lista original não foram encontrados ou estão desativados e foram removidos automaticamente.`;
-            
-            alert(msg);
             if ($('input[name="recipientType"]:checked').val() !== 'list') {
                 $('input[name="recipientType"][value="list"]').prop('checked', true).trigger('change');
             }
@@ -563,16 +707,13 @@ function deleteFile(filename, type) {
 
 async function sendMessages() {
     const message = $('#messageContent').val().trim();
-    updateRecipientCount(); // Garantir que a lista está atualizada
+    updateRecipientCount();
     if (selectedClients.length === 0) return alert('Selecione destinatários');
     if (!message) return alert('Digite uma mensagem');
     if (!confirm(`Enviar para ${selectedClients.length} cliente(s)?`)) return;
     isStopped = false;
     $('#overlay').css('display', 'flex'); $('#overlay-content').empty(); $('#btn-parar').show(); $('#btn-fechar').hide();
-    
-    // CORREÇÃO: Mapear os IDs selecionados para os dados atuais dos clientes
     const clientsData = selectedClients.map(id => allClients.find(c => c.id == id)).filter(c => c);
-    
     for (let i = 0; i < clientsData.length; i++) {
         if (isStopped) { $('#overlay-content').append('<br><b style="color:red;">⚠️ Interrompido.</b>'); break; }
         const contato = clientsData[i];
@@ -583,8 +724,6 @@ async function sendMessages() {
             $('#overlay-content').append(`<br>Enviando para: <b>${res.nome}</b>... ${status}`);
             $('#overlay-content').scrollTop($('#overlay-content')[0].scrollHeight);
         } catch (e) { $('#overlay-content').append(`<br><span style="color:red;">Erro ao enviar para ${contato.nome}</span>`); }
-        
-        // Pausa aleatória entre TEMPO_MIN e TEMPO_MAX configurados no config.php
         const delay = Math.floor(Math.random() * (TEMPO_MAX - TEMPO_MIN + 1) + TEMPO_MIN);
         if (delay > 0 && i < clientsData.length - 1) {
             const segs = Math.round(delay / 1000);
@@ -600,11 +739,9 @@ function stopSending() { isStopped = true; $('#btn-parar').prop('disabled', true
 function openLoadListModal() { $('#loadListModal').addClass('active'); }
 function openLoadMessageModal() { $('#loadMessageModal').addClass('active'); }
 
-// Variaveis globais para edicao
 let currentEditListFilename = '';
 let currentEditMessageFilename = '';
 
-// Funcao para abrir modal de edicao de lista
 function editList(filename) {
     $.post('', { action: 'loadList', filename }, function(res) {
         if (res.success) {
@@ -615,7 +752,7 @@ function editList(filename) {
             const clientIds = data.clientIds || [];
             allClients.forEach(client => {
                 const isChecked = clientIds.includes(client.id) ? 'checked' : '';
-                clientsHtml += `<div class="checkbox-item"><input type="checkbox" id="edit_client_${client.id}" value="${client.id}" ${isChecked} class="check"><label for="edit_client_${client.id}"><strong>${client.nome}</strong> - ${client.celular}</label></div>`;
+                clientsHtml += `<div class="checkbox-item"><input type="checkbox" id="edit_client_${client.id}" value="${client.id}" ${isChecked} class="check"><label for="edit_client_${client.id}"><span class="badge-${client.origem}">${client.origem.toUpperCase()}</span><strong>${client.nome}</strong> - ${client.celular}</label></div>`;
             });
             $('#editListClientsContainer').html(clientsHtml);
             $('#editListModal').addClass('active');
@@ -634,7 +771,7 @@ function saveEditedList() {
     });
     if (editedClients.length === 0) return alert('Selecione clientes para salvar a lista');
     $.post('', { action: 'editList', oldFilename: currentEditListFilename, name, clients: JSON.stringify(editedClients), isEdit: 'true' }, function(res) {
-        if (res.success) { alert('Lista atualizada com sucesso!'); $('#editListModal').removeClass('active'); loadSavedLists(); }
+        if (res.success) { alert('Lista atualizada com sucesso!'); location.reload(); }
         else { alert(res.error || 'Erro ao atualizar a lista.'); }
     });
 }
