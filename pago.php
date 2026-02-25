@@ -181,7 +181,7 @@ $result = $stmt->get_result();
     </div>
 
     <div class="card mb-3">
-        <form method="get" class="search-container">
+        <form method="get" class="search-container" id="searchForm">
             <input type="hidden" name="menumes" value="<?= $valorsel ?>">
             <input type="hidden" name="order_by" value="<?= $order_by ?>">
             <input type="hidden" name="order_dir" value="<?= $order_dir ?>">
@@ -190,8 +190,7 @@ $result = $stmt->get_result();
                     <option value="<?= $l ?>" <?= $limit == $l ? 'selected' : '' ?>><?= $l ?></option>
                 <?php endforeach; ?>
             </select>
-            <input type="text" name="search" class="resp-search" placeholder="Buscar nome ou celular..." value="<?= htmlspecialchars($search) ?>">
-            <button type="submit" class="button btn-search">🔍</button>
+            <input type="text" name="search" class="resp-search" id="searchInput" placeholder="Buscar nome ou celular..." value="<?= htmlspecialchars($search) ?>">
         </form>
     </div>
 
@@ -321,6 +320,18 @@ $(document).ready(() => {
         const s = Object.values(getSelected());
         if (s.length === 0) return alert('Selecione pelo menos um!');
         if (confirm(`Enviar para ${s.length} selecionados?`)) { sessionStorage.removeItem(STORAGE_KEY); processarEnvios(s); }
+    });
+
+    // Pesquisa dinamica
+    let searchTimeout;
+    $('#searchInput').on('keyup', function() {
+        clearTimeout(searchTimeout);
+        const searchValue = $(this).val();
+        searchTimeout = setTimeout(() => {
+            if (searchValue.length > 0 || searchValue.length === 0) {
+                $('#searchForm').submit();
+            }
+        }, 300);
     });
 
     updateSelectedCount();
