@@ -72,13 +72,13 @@ function saveConfig($file, $data) {
     $template = preg_replace('/\$ignorar_fds_feriado\s*=\s*\d+/', '$ignorar_fds_feriado = ' . (isset($data['ignorar_fds_feriado']) ? 1 : 0), $template);
     
     // Atualizar arrays de dias
-    $diasnoprazo = array_map('intval', array_filter(array_map('trim', explode(',', $data['diasnoprazo']))));
-    $diasvencido = array_map('intval', array_filter(array_map('trim', explode(',', $data['diasvencido']))));
-    $diaspago = array_map('intval', array_filter(array_map('trim', explode(',', $data['diaspago']))));
+    $diasnoprazo = implode(', ', array_map('intval', array_filter(array_map('trim', explode(',', $data['diasnoprazo'])), 'strlen')));
+    $diasvencido = implode(', ', array_map('intval', array_filter(array_map('trim', explode(',', $data['diasvencido'])), 'strlen')));
+    $diaspago = implode(', ', array_map('intval', array_filter(array_map('trim', explode(',', $data['diaspago'])), 'strlen')));
     
-    $template = preg_replace('/\$diasnoprazo\s*=\s*\[.*?\]/', '$diasnoprazo = [' . implode(', ', $diasnoprazo) . ']', $template);
-    $template = preg_replace('/\$diasvencido\s*=\s*\[.*?\]/', '$diasvencido = [' . implode(', ', $diasvencido) . ']', $template);
-    $template = preg_replace('/\$diaspago\s*=\s*\[.*?\]/', '$diaspago = [' . implode(', ', $diaspago) . ']', $template);
+    $template = preg_replace('/\$diasnoprazo\s*=\s*\[.*?\]/', '$diasnoprazo = [' . $diasnoprazo . ']', $template);
+    $template = preg_replace('/\$diasvencido\s*=\s*\[.*?\]/', '$diasvencido = [' . $diasvencido . ']', $template);
+    $template = preg_replace('/\$diaspago\s*=\s*\[.*?\]/', '$diaspago = [' . $diaspago . ']', $template);
     
     // Atualizar horários
     $template = preg_replace('/\$horario_noprazo\s*=\s*"([^"]+)"/', '$horario_noprazo = "' . addslashes($data['horario_noprazo']) . '"', $template);
