@@ -330,6 +330,15 @@ $(document).ready(() => {
         }, 300);
     });
 
+    // Manter foco no campo de busca após o carregamento
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput && searchInput.value.length > 0) {
+        setTimeout(() => {
+            searchInput.focus();
+            searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+        }, 100);
+    }
+
     updateSelectedCount();
 });
 </script>
