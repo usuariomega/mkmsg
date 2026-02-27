@@ -84,7 +84,7 @@ $msgbloqueado = carregarMensagemArquivo($fileBloqueado);
                         <textarea name="msgnoprazo" id="input-noprazo" oninput="updatePreview('noprazo')"><?php echo htmlspecialchars($msgnoprazo); ?></textarea>
                         <div class="coringas-list">
                             <b>📌 Coringas Disponíveis:</b><br>
-                            %nomeresumido%, %vencimento%, %valor%, %linhadig%, %qrcode%, %copiacola%, %provedor%, %site%<br>
+                            %nomeresumido%, %datavenc%, %valor%, %linhadig%, %qrcode%, %copiacola%, %provedor%, %site%<br>
                             <b>⚡ Comandos:</b> %0A (Quebra de Linha), ## (Novo Balão)
                         </div>
                     </div>
@@ -110,7 +110,7 @@ $msgbloqueado = carregarMensagemArquivo($fileBloqueado);
                         <textarea name="msgpago" id="input-pago" oninput="updatePreview('pago')"><?php echo htmlspecialchars($msgpago); ?></textarea>
                         <div class="coringas-list">
                             <b>📌 Coringas Disponíveis:</b><br>
-                            %nomeresumido%, %valor%, %datapago%, %provedor%, %site%<br>
+                            %nomeresumido%,  %datapag%, %valor%, %provedor%, %site%<br>
                             <b>⚡ Comandos:</b> %0A (Quebra de Linha), ## (Novo Balão)
                         </div>
                     </div>
@@ -136,7 +136,7 @@ $msgbloqueado = carregarMensagemArquivo($fileBloqueado);
                         <textarea name="msgvencido" id="input-vencido" oninput="updatePreview('vencido')"><?php echo htmlspecialchars($msgvencido); ?></textarea>
                         <div class="coringas-list">
                             <b>📌 Coringas Disponíveis:</b><br>
-                            %nomeresumido%, %vencimento%, %valor%, %linhadig%, %qrcode%, %copiacola%, %provedor%, %site%<br>
+                            %nomeresumido%, %datavenc%, %valor%, %linhadig%, %qrcode%, %copiacola%, %provedor%, %site%<br>
                             <b>⚡ Comandos:</b> %0A (Quebra de Linha), ## (Novo Balão)
                         </div>
                     </div>
@@ -162,7 +162,7 @@ $msgbloqueado = carregarMensagemArquivo($fileBloqueado);
                         <textarea name="msgbloqueado" id="input-bloqueado" oninput="updatePreview('bloqueado')"><?php echo htmlspecialchars($msgbloqueado); ?></textarea>
                         <div class="coringas-list">
                             <b>📌 Coringas Disponíveis:</b><br>
-                            %nomeresumido%, %vencimento%, %valor%, %linhadig%, %qrcode%, %copiacola%, %provedor%, %site%<br>
+                            %nomeresumido%, %datavenc%, %valor%, %linhadig%, %qrcode%, %copiacola%, %provedor%, %site%<br>
                             <b>⚡ Comandos:</b> %0A (Quebra de Linea), ## (Novo Balão)
                         </div>
                     </div>
@@ -192,14 +192,14 @@ function updatePreview(type) {
     
     const mockData = {
         '%nomeresumido%': '<b>João</b>',
-        '%vencimento%': '<b>10/02/2026</b>',
+        '%datavenc%': '<b>10/02/2026</b>',
         '%valor%': '<b>R$ 99,90</b>',
         '%linhadig%': '<b>00190.00009 02714.720008 05071.402272 9 0000000000</b>',
         '%qrcode%': '<b>[QR CODE]</b>',
         '%copiacola%': '<b>00020101021226850014br.gov.bcb.pix...</b>',
         '%provedor%': '<b><?php echo $provedor ?? "Provedor Exemplo"; ?></b>',
         '%site%': '<b><?php echo $site ?? "www.exemplo.com.br"; ?></b>',
-        '%datapago%': '<b>27/01/2026</b>'
+        '%datapag%': '<b>27/01/2026</b>'
     };
 
     previewContainer.innerHTML = '';

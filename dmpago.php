@@ -103,7 +103,7 @@ foreach ($diaspago as $dias) {
         }
 
         $nome = $row['nome_res'];
-        $buscar = ['/%provedor%/', '/%nomeresumido%/', '/%pagamento%/', '/%valor%/', '/%linhadig%/', '/%copiacola%/', '/%site%/'];
+        $buscar = ['/%provedor%/', '/%nomeresumido%/', '/%datapag%/', '/%valor%/', '/%linhadig%/', '/%copiacola%/', '/%site%/'];
         $substituir = [$provedor, $nome, $row['datapag_fmt'], $row['valor'], $row['linhadig'], urlencode($row['qrcode']), $site];
         $msgFinal = preg_replace($buscar, $substituir, $msg);
 

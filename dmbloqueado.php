@@ -103,7 +103,7 @@ while ($row = $result->fetch_assoc()) {
     }
 
     $nome = $row['nome_res'];
-    $buscar = ['/%provedor%/', '/%nomeresumido%/', '/%vencimento%/', '/%valor%/', '/%linhadig%/', '/%copiacola%/', '/%site%/', '/%dias_corte%/'];
+    $buscar = ['/%provedor%/', '/%nomeresumido%/', '/%datavenc%/', '/%valor%/', '/%linhadig%/', '/%copiacola%/', '/%site%/', '/%dias_corte%/'];
     $substituir = [$provedor, $nome, $row['datavenc_fmt'], $row['valor'], $row['linhadig'], urlencode($row['qrcode'] ?? ''), $site, $dias_corte];
     $msgFinal = preg_replace($buscar, $substituir, $msg);
 

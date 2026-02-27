@@ -20,7 +20,7 @@ if (isset($_POST['ajax_send']) || isset($_POST['get_all_ids'])) {
         $linhadig = $contato['linhadig'] ?? '';
         $qrcode = $contato['qrcode'] ?? '';
 
-        $buscar = ['/%provedor%/', '/%nomeresumido%/', '/%vencimento%/' , '/%valor%/', '/%linhadig%/', '/%copiacola%/', '/%site%/'];
+        $buscar = ['/%provedor%/', '/%nomeresumido%/', '/%datavenc%/' , '/%valor%/', '/%linhadig%/', '/%copiacola%/', '/%site%/'];
         $substituir = [$provedor, $nome, $datavenc, $valor, $linhadig, urlencode($qrcode), $site];
         $msgFinal = preg_replace($buscar, $substituir, $msgvencido);
 

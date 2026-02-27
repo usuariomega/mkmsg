@@ -123,7 +123,7 @@ foreach ($diasnoprazo as $dias) {
         }
 
         $nome = $row['nome_res'];
-        $buscar = ['/%provedor%/', '/%nomeresumido%/', '/%vencimento%/' , '/%valor%/', '/%linhadig%/', '/%copiacola%/', '/%site%/'];
+        $buscar = ['/%provedor%/', '/%nomeresumido%/', '/%datavenc%/' , '/%valor%/', '/%linhadig%/', '/%copiacola%/', '/%site%/'];
         $substituir = [$provedor, $nome, $row['datavenc_fmt'], $row['valor'], $row['linhadig'], urlencode($row['qrcode']), $site];
         $msgFinal = preg_replace($buscar, $substituir, $msg);
 
