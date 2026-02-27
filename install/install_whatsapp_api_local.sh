@@ -264,6 +264,8 @@ const app = express()
 app.use(express.json())
 app.use(express.static('public'))
 
+const TELEGRAM_CONFIG_FILE = path.join(process.cwd(), 'telegram_config.json')
+
 app.get('/', (req, res) => res.sendFile(path.join(process.cwd(), 'public/index.html')))
 
 app.get('/logs', (req, res) => {
@@ -278,6 +280,21 @@ app.get('/logs-data', (req, res) => {
   const latestLog = path.join(logDir, files[0])
   const content = fs.readFileSync(latestLog, 'utf8')
   res.send(content)
+})
+
+app.get('/telegram-config', (req, res) => {
+  if (fs.existsSync(TELEGRAM_CONFIG_FILE)) {
+    const config = JSON.parse(fs.readFileSync(TELEGRAM_CONFIG_FILE, 'utf8'))
+    res.json(config)
+  } else {
+    res.json({ botToken: '', chatId: '' })
+  }
+})
+
+app.post('/telegram-config', (req, res) => {
+  const { botToken, chatId } = req.body
+  fs.writeFileSync(TELEGRAM_CONFIG_FILE, JSON.stringify({ botToken, chatId }))
+  res.json({ status: 'success' })
 })
 
 app.get('/status', (req, res) => {
@@ -317,8 +334,9 @@ async function connectToWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState('auth')
   sock = makeWASocket({
     auth: state,
+    printQRInTerminal: false,
     logger: pino({ level: 'silent' }),
-    browser: ['macOS', 'Chrome', '144.0.7559.96']
+    browser: ['Mac OS', 'Chrome', '146.0.0.0']
   })
   sock.ev.on('creds.update', saveCreds)
   sock.ev.on('connection.update', async (update) => {
@@ -379,6 +397,13 @@ body{font-family:sans-serif;background:var(--bg);color:var(--text);display:flex;
 @media(min-width:600px){.title{font-size:28px}.l-row{flex-direction:row;align-items:center}.l-meta{margin-bottom:0;width:280px;flex-shrink:0}.msg{flex:1}}
 button{padding:6px 12px;border:none;border-radius:6px;background:#374151;color:#fff;cursor:pointer;font-size:12px;margin-left:5px}
 .btn-group{display:flex;align-items:center}
+.modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.5);align-items:center;justify-content:center}
+.modal-content{background:#fff;padding:20px;border-radius:12px;width:90%;max-width:400px;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+.modal-content h3{margin-top:0;color:var(--primary)}
+.modal-content input{width:100%;padding:10px;margin:10px 0;border:1px solid var(--border);border-radius:6px}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:15px}
+.btn-save{background:var(--green)}
+.btn-cancel{background:var(--muted)}
 </style>
 </head>
 <body>
@@ -393,16 +418,52 @@ button{padding:6px 12px;border:none;border-radius:6px;background:#374151;color:#
         <button id="ps">⏸ Pausar</button>
         <button id="openLog" onclick="window.open('/logs', '_blank')">📂 Abrir Log</button>
         <button id="clearLog" onclick="clearLocalLog()">🧹 Limpar Log</button>
+        <button id="tgBtn" onclick="openTelegramModal()">🔔 Alertar se Offline</button>
       </div>
     </div>
     <div id="lb" class="l-body"></div>
   </div>
 </div>
+
+<div id="tgModal" class="modal">
+  <div class="modal-content">
+    <h3>🔔 Configurar Alerta Telegram</h3>
+    <p style="font-size:12px; color:var(--muted); margin-bottom:15px;">
+      Configure abaixo para receber uma notificação automática no seu Telegram caso o status do WhatsApp mude de <b>Online</b> para <b>Offline</b>.
+    </p>
+    <label class="label">BOT TOKEN</label>
+    <input type="text" id="botToken" placeholder="Ex: 123456:ABCDEF...">
+    <label class="label">CHAT ID</label>
+    <input type="text" id="chatId" placeholder="Ex: -123456789">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeTelegramModal()">Cancelar</button>
+      <button class="btn-save" onclick="saveTelegramConfig()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let sc=true;const ps=document.getElementById('ps');ps.onclick=()=>{sc=!sc;ps.textContent=sc?'⏸ Pausar':'▶ Retomar'};
 function clearLocalLog() {
   const lb = document.getElementById('lb');
   lb.innerHTML = '<div style="padding:20px;text-align:center;color:#999">Log limpo pelo usuário</div>';
+}
+function openTelegramModal() {
+  fetch('/telegram-config').then(r=>r.json()).then(d=>{
+    document.getElementById('botToken').value = d.botToken || '';
+    document.getElementById('chatId').value = d.chatId || '';
+    document.getElementById('tgModal').style.display = 'flex';
+  });
+}
+function closeTelegramModal() { document.getElementById('tgModal').style.display = 'none'; }
+function saveTelegramConfig() {
+  const botToken = document.getElementById('botToken').value;
+  const chatId = document.getElementById('chatId').value;
+  fetch('/telegram-config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ botToken, chatId })
+  }).then(() => { alert('Configuração salva!'); closeTelegramModal(); });
 }
 async function up(){
   try{
@@ -477,7 +538,37 @@ loadLogs();setInterval(loadLogs,30000);
 EOF
 chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/public/log_viewer.html"
 
-# 11. PHP (exemplo de integração)
+# 11. Script de Alerta Telegram
+log "📝 Criando script de alerta Telegram..."
+cat <<'EOF' > "$APP_DIR/telegram_alert.sh"
+#!/bin/bash
+CONFIG_FILE="$(dirname "$0")/telegram_config.json"
+if [ ! -f "$CONFIG_FILE" ]; then exit 0; fi
+
+BOT_TOKEN=$(grep -oP '"botToken":"\K[^"]+' "$CONFIG_FILE")
+CHAT_ID=$(grep -oP '"chatId":"\K[^"]+' "$CONFIG_FILE")
+
+if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then exit 0; fi
+
+API_URL="http://localhost:8000/status"
+MSG="⚠️ WhatsApp Desconectado!"
+
+STATUS=$(curl -s "$API_URL" | grep -o '"status":"[^"]*"' | cut -d'"' -f4 | head -1)
+
+if [ "$STATUS" != "connected" ]; then
+    curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+      -d "chat_id=${CHAT_ID}" \
+      -d "text=${MSG}" > /dev/null
+fi
+EOF
+chmod +x "$APP_DIR/telegram_alert.sh"
+chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/telegram_alert.sh"
+
+# 12. Configurar Cron para Alerta
+log "⏰ Configurando Cron para alertas (a cada 4 horas)..."
+(crontab -l 2>/dev/null | grep -v "telegram_alert.sh"; echo "0 7,11,15 * * * /bin/bash $APP_DIR/telegram_alert.sh > /dev/null 2>&1") | crontab -
+
+# 13. PHP (exemplo de integração)
 log "📝 Criando arquivo de exemplos..."
 cat <<EOF > "$APP_DIR/public/exemplo.html"
 <!DOCTYPE html>
@@ -513,18 +604,15 @@ echo file_get_contents(\$api_url, false, \$context);
 EOF
 chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/public/exemplo.html"
 
-
 #Correção temporária
 sed -i 's/proto.ClientPayload.UserAgent.Platform.WEB/proto.ClientPayload.UserAgent.Platform.MACOS/' $APP_DIR/node_modules/@whiskeysockets/baileys/lib/Utils/validate-connection.js
 
-
-# 12. Iniciar com PM2 e configurar Startup
+# 14. Iniciar com PM2 e configurar Startup
 log "🚀 Iniciando a API com PM2..."
 su - "$TARGET_USER" -c "cd $APP_DIR && pm2 start index.js --name $APP_NAME --silent"
 su - "$TARGET_USER" -c "pm2 save --silent"
 
 log "⚙️  Configurando PM2 para iniciar automaticamente no boot..."
-# O comando 'pm2 startup' gera um comando que deve ser rodado como root
 STARTUP_CMD=$(su - "$TARGET_USER" -c "pm2 startup systemd" | grep "sudo" | sed 's/sudo //')
 if [ -n "$STARTUP_CMD" ]; then
     eval "$STARTUP_CMD" >/dev/null 2>&1
