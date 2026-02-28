@@ -257,6 +257,7 @@ import QRCode from 'qrcode'
 import fs from 'fs'
 import path from 'path'
 import pino from 'pino'
+import { exec } from 'child_process'
 import { API_TOKEN, PORT } from './config.js'
 import { addToQueue, getQueueSize, getSentLogs } from './queue.js'
 
@@ -287,13 +288,23 @@ app.get('/telegram-config', (req, res) => {
     const config = JSON.parse(fs.readFileSync(TELEGRAM_CONFIG_FILE, 'utf8'))
     res.json(config)
   } else {
-    res.json({ botToken: '', chatId: '' })
+    res.json({ botToken: '', chatId: '', schedule: '0 7,11,15 * * *' })
   }
 })
 
 app.post('/telegram-config', (req, res) => {
-  const { botToken, chatId } = req.body
-  fs.writeFileSync(TELEGRAM_CONFIG_FILE, JSON.stringify({ botToken, chatId }))
+  const { botToken, chatId, schedule } = req.body
+  fs.writeFileSync(TELEGRAM_CONFIG_FILE, JSON.stringify({ botToken, chatId, schedule }))
+  
+  if (schedule) {
+    const alertScript = path.join(process.cwd(), 'telegram_alert.sh');
+    const cronCmd = `(crontab -l 2>/dev/null | grep -v "telegram_alert.sh"; echo "${schedule} /bin/bash ${alertScript} > /dev/null 2>&1") | crontab -`;
+    exec(cronCmd, (error) => {
+      if (error) console.error(`Erro ao atualizar cron: ${error}`);
+      else console.log('Cron atualizado com sucesso');
+    });
+  }
+  
   res.json({ status: 'success' })
 })
 
@@ -398,12 +409,17 @@ body{font-family:sans-serif;background:var(--bg);color:var(--text);display:flex;
 button{padding:6px 12px;border:none;border-radius:6px;background:#374151;color:#fff;cursor:pointer;font-size:12px;margin-left:5px}
 .btn-group{display:flex;align-items:center}
 .modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.5);align-items:center;justify-content:center}
-.modal-content{background:#fff;padding:20px;border-radius:12px;width:90%;max-width:400px;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+.modal-content{background:#fff;padding:20px;border-radius:12px;width:95%;max-width:480px;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
 .modal-content h3{margin-top:0;color:var(--primary)}
-.modal-content input{width:100%;padding:10px;margin:10px 0;border:1px solid var(--border);border-radius:6px}
+.modal-content input, .modal-content select{width:100%;padding:10px;margin:10px 0;border:1px solid var(--border);border-radius:6px;font-size:14px}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:15px}
 .btn-save{background:var(--green)}
 .btn-cancel{background:var(--muted)}
+.help-text{font-size:11px;color:var(--muted);margin-top:5px;margin-bottom:10px;line-height:1.4}
+.help-table{width:100%;border-collapse:collapse;margin-top:5px}
+.help-table td{padding:2px 0;vertical-align:top}
+.help-table td:first-child{width:60px;font-weight:bold;color:var(--text)}
+.custom-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 </style>
 </head>
 <body>
@@ -429,12 +445,44 @@ button{padding:6px 12px;border:none;border-radius:6px;background:#374151;color:#
   <div class="modal-content">
     <h3>🔔 Configurar Alerta Telegram</h3>
     <p style="font-size:12px; color:var(--muted); margin-bottom:15px;">
-      Configure abaixo para receber uma notificação automática no seu Telegram caso o status do WhatsApp mude de <b>Online</b> para <b>Offline</b>.
+      Configure abaixo para receber uma notificação automática no seu Telegram caso o status do WhatsApp mude para <b>Offline</b>.
     </p>
     <label class="label">BOT TOKEN</label>
     <input type="text" id="botToken" placeholder="Ex: 123456:ABCDEF...">
     <label class="label">CHAT ID</label>
     <input type="text" id="chatId" placeholder="Ex: -123456789">
+    
+    <label class="label">AGENDAR HORÁRIOS DE ALERTA</label>
+    <select id="alertSchedule">
+      <option value="0 * * * *">A cada 1 hora (Sempre)</option>
+      <option value="0 */2 * * *">A cada 2 horas (Sempre)</option>
+      <option value="0 8-18 * * *">Horário Comercial (08h às 18h)</option>
+      <option value="0 8,12,18 * * *">3 vezes ao dia (08h, 12h, 18h)</option>
+      <option value="0 7,11,15,19 * * *">4 vezes ao dia (07h, 11h, 15h, 19h)</option>
+      <option value="custom">Personalizado (Configurar Minutos e Horas)</option>
+    </select>
+    
+    <div id="customScheduleBox" style="display:none">
+      <div class="custom-grid">
+        <div>
+          <label class="label">MINUTOS (0-59)</label>
+          <input type="text" id="customMinutes" placeholder="Ex: 0 ou */20">
+        </div>
+        <div>
+          <label class="label">HORAS (0-23)</label>
+          <input type="text" id="customHours" placeholder="Ex: * ou 8,12,18">
+        </div>
+      </div>
+      <div class="help-text">
+        <b>Dicas de preenchimento</b>
+        <table class="help-table">
+          <tr><td>*</td><td>Executa em todos os valores (sempre)</td></tr>
+          <tr><td>*/20</td><td>Executa a cada 20 unidades (ex: a cada 20 min)</td></tr>
+          <tr><td>1,5,10</td><td>Executa apenas nos valores específicos escolhidos</td></tr>
+        </table>
+      </div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeTelegramModal()">Cancelar</button>
       <button class="btn-save" onclick="saveTelegramConfig()">Salvar</button>
@@ -444,6 +492,10 @@ button{padding:6px 12px;border:none;border-radius:6px;background:#374151;color:#
 
 <script>
 let sc=true;const ps=document.getElementById('ps');ps.onclick=()=>{sc=!sc;ps.textContent=sc?'⏸ Pausar':'▶ Retomar'};
+document.getElementById('alertSchedule').onchange = function() {
+  document.getElementById('customScheduleBox').style.display = this.value === 'custom' ? 'block' : 'none';
+};
+
 function clearLocalLog() {
   const lb = document.getElementById('lb');
   lb.innerHTML = '<div style="padding:20px;text-align:center;color:#999">Log limpo pelo usuário</div>';
@@ -452,6 +504,28 @@ function openTelegramModal() {
   fetch('/telegram-config').then(r=>r.json()).then(d=>{
     document.getElementById('botToken').value = d.botToken || '';
     document.getElementById('chatId').value = d.chatId || '';
+    const select = document.getElementById('alertSchedule');
+    const customBox = document.getElementById('customScheduleBox');
+    
+    if (d.schedule) {
+      let found = false;
+      for(let i=0; i<select.options.length; i++) {
+        if(select.options[i].value === d.schedule) {
+          select.selectedIndex = i;
+          found = true;
+          break;
+        }
+      }
+      if(!found) {
+        select.value = 'custom';
+        const parts = d.schedule.split(' ');
+        document.getElementById('customMinutes').value = parts[0];
+        document.getElementById('customHours').value = parts[1];
+        customBox.style.display = 'block';
+      } else {
+        customBox.style.display = 'none';
+      }
+    }
     document.getElementById('tgModal').style.display = 'flex';
   });
 }
@@ -459,11 +533,23 @@ function closeTelegramModal() { document.getElementById('tgModal').style.display
 function saveTelegramConfig() {
   const botToken = document.getElementById('botToken').value;
   const chatId = document.getElementById('chatId').value;
+  let schedule = document.getElementById('alertSchedule').value;
+  
+  if (schedule === 'custom') {
+    const mins = document.getElementById('customMinutes').value.replace(/\s/g, '') || '0';
+    const hours = document.getElementById('customHours').value.replace(/\s/g, '') || '*';
+    if (!/^[0-9,*/-]+$/.test(mins) || !/^[0-9,*/-]+$/.test(hours)) { 
+      alert('Formato de minutos ou horas inválido! Use apenas números, vírgulas, asteriscos ou barras.'); 
+      return; 
+    }
+    schedule = `${mins} ${hours} * * *`;
+  }
+
   fetch('/telegram-config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ botToken, chatId })
-  }).then(() => { alert('Configuração salva!'); closeTelegramModal(); });
+    body: JSON.stringify({ botToken, chatId, schedule })
+  }).then(() => { alert('Configuração salva e Cron atualizado!'); closeTelegramModal(); });
 }
 async function up(){
   try{
@@ -564,9 +650,10 @@ EOF
 chmod +x "$APP_DIR/telegram_alert.sh"
 chown "$TARGET_USER":"$TARGET_USER" "$APP_DIR/telegram_alert.sh"
 
-# 12. Configurar Cron para Alerta
-log "⏰ Configurando Cron para alertas (a cada 4 horas)..."
-(crontab -l 2>/dev/null | grep -v "telegram_alert.sh"; echo "0 7,11,15 * * * /bin/bash $APP_DIR/telegram_alert.sh > /dev/null 2>&1") | crontab -
+# 12. Configurar Cron para Alerta (Unificado no usuário da aplicação)
+log "⏰ Configurando Cron inicial (a cada 4 horas) no usuário $TARGET_USER..."
+crontab -l 2>/dev/null | grep -v "telegram_alert.sh" | crontab -
+su - "$TARGET_USER" -c "(crontab -l 2>/dev/null | grep -v 'telegram_alert.sh'; echo '0 7,11,15 * * * /bin/bash $APP_DIR/telegram_alert.sh > /dev/null 2>&1') | crontab -"
 
 # 13. PHP (exemplo de integração)
 log "📝 Criando arquivo de exemplos..."
