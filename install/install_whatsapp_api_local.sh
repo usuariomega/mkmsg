@@ -374,6 +374,74 @@ app.post('/send', auth, (req, res) => {
   } catch (e) { res.json({ status: 'error' }); }
 })
 
+// ============================================================
+// Evolution API V2 - Compatibilidade de rotas
+// Usa o mesmo API_TOKEN com header "apikey"
+// Nome da instância na URL é aceito mas ignorado (instância única)
+// ============================================================
+
+const authEvolution = (req, res, next) => {
+  if (req.headers['apikey'] !== API_TOKEN) return res.status(401).json({ status: 'error', message: 'Unauthorized' })
+  next()
+}
+
+// POST /message/sendText/:instance
+app.post('/message/sendText/:instance', authEvolution, (req, res) => {
+  const { number, text } = req.body
+  const textContent = typeof text === 'object' ? text.text : text
+  if (!number || !textContent || status !== 'connected') return res.status(400).json({ status: 'error', message: 'Parâmetros inválidos ou WhatsApp desconectado' })
+  try {
+    const jid = formatBrazilianNumber(number)
+    const messages = normalizeMessage(textContent)
+    addToQueue(async () => { for (const m of messages) { await sock.sendMessage(jid, { text: m }) } }, { mensagem: textContent })
+    res.json({ key: { remoteJid: jid }, status: 'PENDING', message: { conversation: textContent } })
+  } catch (e) { res.status(500).json({ status: 'error', message: e.message }) }
+})
+
+// POST /message/sendMedia/:instance  (image, video e document)
+app.post('/message/sendMedia/:instance', authEvolution, async (req, res) => {
+  const { number, mediatype, mimetype, caption, media, fileName } = req.body
+  if (!number || !media || !mediatype || status !== 'connected') return res.status(400).json({ status: 'error', message: 'Parâmetros inválidos ou WhatsApp desconectado' })
+  try {
+    const jid = formatBrazilianNumber(number)
+    const type = mediatype.toLowerCase()
+    let mediaContent
+    if (media.startsWith('http://') || media.startsWith('https://')) {
+      mediaContent = { url: media }
+    } else {
+      mediaContent = Buffer.from(media, 'base64')
+    }
+    let msgPayload
+    if (type === 'image') {
+      msgPayload = { image: mediaContent, caption: caption || '', mimetype: mimetype || 'image/jpeg' }
+    } else if (type === 'video') {
+      msgPayload = { video: mediaContent, caption: caption || '', mimetype: mimetype || 'video/mp4' }
+    } else {
+      msgPayload = { document: mediaContent, mimetype: mimetype || 'application/octet-stream', fileName: fileName || 'arquivo', caption: caption || '' }
+    }
+    const logMsg = `[${type}] ${fileName || media.substring(0, 60)} → ${number}`
+    addToQueue(async () => { await sock.sendMessage(jid, msgPayload) }, { mensagem: logMsg })
+    res.json({ key: { remoteJid: jid }, status: 'PENDING', mediaType: type })
+  } catch (e) { res.status(500).json({ status: 'error', message: e.message }) }
+})
+
+// POST /telegram-test — envia mensagem de teste via bot configurado
+app.post('/telegram-test', async (req, res) => {
+  const { botToken, chatId } = req.body
+  if (!botToken || !chatId) return res.status(400).json({ ok: false, message: 'botToken e chatId são obrigatórios' })
+  try {
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: '✅ Teste de alerta WhatsApp API — configuração OK!' })
+    })
+    const data = await response.json()
+    if (data.ok) res.json({ ok: true })
+    else res.status(400).json({ ok: false, message: data.description || 'Erro desconhecido do Telegram' })
+  } catch (e) { res.status(500).json({ ok: false, message: e.message }) }
+})
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`)
   connectToWhatsApp()
@@ -420,7 +488,19 @@ button{padding:6px 12px;border:none;border-radius:6px;background:#374151;color:#
 .help-table td{padding:2px 0;vertical-align:top}
 .help-table td:first-child{width:60px;font-weight:bold;color:var(--text)}
 .custom-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-</style>
+.btn-test{background:#2563eb;font-size:12px;padding:6px 10px}
+.field-wrap{position:relative;margin:6px 0 2px}
+.field-wrap input{margin:0;padding-right:30px}
+.field-icon{position:absolute;right:9px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none}
+.field-msg{font-size:11px;min-height:16px;margin-bottom:4px}
+.field-msg.err{color:#dc2626}
+.field-msg.ok{color:#16a34a}
+.input-valid{border-color:#16a34a!important;background:#f0fdf4}
+.input-invalid{border-color:#dc2626!important;background:#fff1f2}
+.cron-preview{font-size:12px;padding:8px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;color:#0369a1;margin:8px 0 4px;min-height:36px;line-height:1.4}
+.test-result{font-size:12px;padding:7px 10px;border-radius:6px;margin-top:6px;display:none}
+.test-ok{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
+.test-fail{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}</style>
 </head>
 <body>
 <div class="container">
@@ -444,16 +524,32 @@ button{padding:6px 12px;border:none;border-radius:6px;background:#374151;color:#
 <div id="tgModal" class="modal">
   <div class="modal-content">
     <h3>🔔 Configurar Alerta Telegram</h3>
-    <p style="font-size:12px; color:var(--muted); margin-bottom:15px;">
-      Configure abaixo para receber uma notificação automática no seu Telegram caso o status do WhatsApp mude para <b>Offline</b>.
+    <p style="font-size:12px; color:var(--muted); margin-bottom:10px;">
+      Receba uma notificação automática no Telegram quando o WhatsApp ficar <b>Offline</b>.
     </p>
+
     <label class="label">BOT TOKEN</label>
-    <input type="text" id="botToken" placeholder="Ex: 123456:ABCDEF...">
+    <div class="field-wrap">
+      <input type="text" id="botToken" placeholder="Ex: 123456789:ABCdef..." oninput="validateBotToken(this)" onpaste="setTimeout(()=>validateBotToken(this),0)">
+      <span class="field-icon" id="iconBotToken"></span>
+    </div>
+    <div class="field-msg" id="msgBotToken"></div>
+
     <label class="label">CHAT ID</label>
-    <input type="text" id="chatId" placeholder="Ex: -123456789">
-    
-    <label class="label">AGENDAR HORÁRIOS DE ALERTA</label>
-    <select id="alertSchedule">
+    <div class="field-wrap">
+      <input type="text" id="chatId" placeholder="Ex: -123456789 ou 123456789" oninput="validateChatId(this)" onpaste="setTimeout(()=>validateChatId(this),0)">
+      <span class="field-icon" id="iconChatId"></span>
+    </div>
+    <div class="field-msg" id="msgChatId"></div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:6px 0 2px">
+      <label class="label" style="margin:0">TESTAR CONFIGURAÇÃO</label>
+      <button class="btn-test" onclick="testTelegram()">📨 Enviar Mensagem Teste</button>
+    </div>
+    <div class="test-result" id="testResult"></div>
+
+    <label class="label" style="margin-top:12px;display:block">AGENDAR HORÁRIOS DE ALERTA</label>
+    <select id="alertSchedule" onchange="onScheduleChange()">
       <option value="0 * * * *">A cada 1 hora (Sempre)</option>
       <option value="0 */2 * * *">A cada 2 horas (Sempre)</option>
       <option value="0 8-18 * * *">Horário Comercial (08h às 18h)</option>
@@ -461,24 +557,34 @@ button{padding:6px 12px;border:none;border-radius:6px;background:#374151;color:#
       <option value="0 7,11,15,19 * * *">4 vezes ao dia (07h, 11h, 15h, 19h)</option>
       <option value="custom">Personalizado (Configurar Minutos e Horas)</option>
     </select>
-    
+
     <div id="customScheduleBox" style="display:none">
-      <div class="custom-grid">
+      <div class="custom-grid" style="margin-top:8px">
         <div>
           <label class="label">MINUTOS (0-59)</label>
-          <input type="text" id="customMinutes" placeholder="Ex: 0 ou */20">
+          <div class="field-wrap">
+            <input type="text" id="customMinutes" placeholder="Ex: 0 ou */20 ou 0,30" oninput="sanitizeCronInput(this,'min')" onpaste="setTimeout(()=>sanitizeCronInput(this,'min'),0)">
+            <span class="field-icon" id="iconMins"></span>
+          </div>
+          <div class="field-msg" id="msgMins"></div>
         </div>
         <div>
           <label class="label">HORAS (0-23)</label>
-          <input type="text" id="customHours" placeholder="Ex: * ou 8,12,18">
+          <div class="field-wrap">
+            <input type="text" id="customHours" placeholder="Ex: * ou 8,12,18 ou 8-18" oninput="sanitizeCronInput(this,'hour')" onpaste="setTimeout(()=>sanitizeCronInput(this,'hour'),0)">
+            <span class="field-icon" id="iconHours"></span>
+          </div>
+          <div class="field-msg" id="msgHours"></div>
         </div>
       </div>
+      <div class="cron-preview" id="cronPreview">⏰ Preencha os campos acima para ver o resumo</div>
       <div class="help-text">
-        <b>Dicas de preenchimento</b>
+        <b>Exemplos válidos</b>
         <table class="help-table">
-          <tr><td>*</td><td>Executa em todos os valores (sempre)</td></tr>
-          <tr><td>*/20</td><td>Executa a cada 20 unidades (ex: a cada 20 min)</td></tr>
-          <tr><td>1,5,10</td><td>Executa apenas nos valores específicos escolhidos</td></tr>
+          <tr><td>*</td><td>Todo valor (ex: toda hora, todo minuto)</td></tr>
+          <tr><td>*/15</td><td>A cada 15 unidades</td></tr>
+          <tr><td>8,12,18</td><td>Apenas nesses valores específicos</td></tr>
+          <tr><td>8-18</td><td>Intervalo de 8 até 18</td></tr>
         </table>
       </div>
     </div>
@@ -492,36 +598,219 @@ button{padding:6px 12px;border:none;border-radius:6px;background:#374151;color:#
 
 <script>
 let sc=true;const ps=document.getElementById('ps');ps.onclick=()=>{sc=!sc;ps.textContent=sc?'⏸ Pausar':'▶ Retomar'};
-document.getElementById('alertSchedule').onchange = function() {
-  document.getElementById('customScheduleBox').style.display = this.value === 'custom' ? 'block' : 'none';
-};
 
 function clearLocalLog() {
   const lb = document.getElementById('lb');
   lb.innerHTML = '<div style="padding:20px;text-align:center;color:#999">Log limpo pelo usuário</div>';
 }
+
+// ── Validação Bot Token ────────────────────────────────────────
+function validateBotToken(el) {
+  const v = el.value.trim();
+  const icon = document.getElementById('iconBotToken');
+  const msg  = document.getElementById('msgBotToken');
+  if (!v) { setField(el, icon, msg, '', '', ''); return false; }
+  const ok = /^\d{6,12}:[A-Za-z0-9_-]{35,}$/.test(v);
+  if (ok) setField(el, icon, msg, 'valid', '✅', '');
+  else    setField(el, icon, msg, 'invalid', '❌', 'Formato inválido. Ex: 123456789:ABCDefgh...');
+  return ok;
+}
+
+// ── Validação Chat ID ──────────────────────────────────────────
+function validateChatId(el) {
+  const v = el.value.trim();
+  const icon = document.getElementById('iconChatId');
+  const msg  = document.getElementById('msgChatId');
+  if (!v) { setField(el, icon, msg, '', '', ''); return false; }
+  const ok = /^-?\d{5,15}$/.test(v);
+  if (ok) setField(el, icon, msg, 'valid', '✅', '');
+  else    setField(el, icon, msg, 'invalid', '❌', 'Deve ser numérico (negativo para grupos). Ex: -123456789');
+  return ok;
+}
+
+// ── Helper visual ──────────────────────────────────────────────
+function setField(el, icon, msg, state, ico, text) {
+  el.className = state === 'valid' ? 'input-valid' : state === 'invalid' ? 'input-invalid' : '';
+  icon.textContent = ico;
+  msg.textContent  = text;
+  msg.className    = 'field-msg ' + (state === 'invalid' ? 'err' : state === 'valid' ? 'ok' : '');
+}
+
+// ── Sanitização e validação cron em tempo real ─────────────────
+function sanitizeCronInput(el, type) {
+  // Remove espaços imediatamente enquanto digita
+  const pos = el.selectionStart;
+  const original = el.value;
+  const clean = original.replace(/\s/g, '');
+  if (clean !== original) {
+    el.value = clean;
+    el.setSelectionRange(Math.max(0, pos - (original.length - clean.length)), Math.max(0, pos - (original.length - clean.length)));
+  }
+  const iconId = type === 'min' ? 'iconMins' : 'iconHours';
+  const msgId  = type === 'min' ? 'msgMins'  : 'msgHours';
+  const max    = type === 'min' ? 59 : 23;
+  validateCronField(el, document.getElementById(iconId), document.getElementById(msgId), max, type);
+  updateCronPreview();
+}
+
+function validateCronField(el, icon, msg, max, type) {
+  const v = el.value.trim();
+  if (!v) { setField(el, icon, msg, '', '', ''); return false; }
+  const result = checkCronExpr(v, max);
+  if (result === true) {
+    setField(el, icon, msg, 'valid', '✅', '');
+    return true;
+  } else {
+    setField(el, icon, msg, 'invalid', '❌', result);
+    return false;
+  }
+}
+
+function checkCronExpr(v, max) {
+  if (v === '*') return true;
+  // */n
+  const stepMatch = v.match(/^\*\/(\d+)$/);
+  if (stepMatch) {
+    const n = parseInt(stepMatch[1]);
+    if (n < 1 || n > max) return `Passo inválido: deve ser entre 1 e ${max}`;
+    return true;
+  }
+  // Partes separadas por vírgula (podem ser números ou ranges)
+  const parts = v.split(',');
+  for (const part of parts) {
+    const rangeMatch = part.match(/^(\d+)-(\d+)$/);
+    if (rangeMatch) {
+      const a = parseInt(rangeMatch[1]), b = parseInt(rangeMatch[2]);
+      if (a > max || b > max) return `Valor fora do limite (máx ${max})`;
+      if (a >= b) return `Intervalo inválido: ${a}-${b} (início deve ser menor que fim)`;
+    } else if (/^\d+$/.test(part)) {
+      if (parseInt(part) > max) return `Valor ${part} fora do limite (máx ${max})`;
+    } else {
+      return `Expressão inválida: "${part}"`;
+    }
+  }
+  return true;
+}
+
+// ── Preview legível do cron ────────────────────────────────────
+function updateCronPreview() {
+  const mins  = document.getElementById('customMinutes').value.trim();
+  const hours = document.getElementById('customHours').value.trim();
+  const el    = document.getElementById('cronPreview');
+  if (!mins || !hours) { el.textContent = '⏰ Preencha os campos acima para ver o resumo'; return; }
+  const mOk = checkCronExpr(mins, 59) === true;
+  const hOk = checkCronExpr(hours, 23) === true;
+  if (!mOk || !hOk) { el.textContent = '⚠️ Corrija os erros acima para ver o resumo'; return; }
+  el.textContent = '⏰ ' + describeCron(mins, hours);
+}
+
+function describeCron(mins, hours) {
+  return describeMinutes(mins) + ', ' + describeHours(hours) + ', todos os dias';
+}
+
+// Formata lista de valores com "e" antes do último: [0,30] → "0 e 30"
+function joinList(items) {
+  if (items.length === 1) return items[0];
+  return items.slice(0, -1).join(', ') + ' e ' + items[items.length - 1];
+}
+
+function describeMinutes(v) {
+  if (v === '*') return 'a cada minuto';
+  const step = v.match(/^\*\/(\d+)$/);
+  if (step) return `a cada ${step[1]} ${step[1] === '1' ? 'minuto' : 'minutos'}`;
+  const parts = v.split(',');
+  const labels = parts.map(p => {
+    const r = p.match(/^(\d+)-(\d+)$/);
+    return r ? `dos minutos ${r[1]} ao ${r[2]}` : null;
+  });
+  // Se tem algum range, retorna descritivo de range
+  if (labels.some(l => l !== null)) {
+    return labels.map((l, i) => l || `minuto ${parts[i]}`).join(', ');
+  }
+  // Lista simples de valores
+  const vals = parts.map(p => `minuto ${p}`);
+  if (vals.length === 1) return vals[0];
+  // "nos minutos X, Y e Z"
+  return 'nos minutos ' + joinList(parts);
+}
+
+function describeHours(v) {
+  if (v === '*') return 'todas as horas';
+  const step = v.match(/^\*\/(\d+)$/);
+  if (step) return `a cada ${step[1]} ${step[1] === '1' ? 'hora' : 'horas'}`;
+  const parts = v.split(',');
+  const labels = parts.map(p => {
+    const r = p.match(/^(\d+)-(\d+)$/);
+    return r ? `das ${r[1]}h às ${r[2]}h` : null;
+  });
+  if (labels.some(l => l !== null)) {
+    return labels.map((l, i) => l || `${parts[i]}h`).join(', ');
+  }
+  if (parts.length === 1) return `à${parseInt(parts[0]) !== 1 ? 's' : ''} ${parts[0]}h`;
+  return 'às ' + joinList(parts.map(p => `${p}h`));
+}
+
+// ── Teste de envio Telegram ────────────────────────────────────
+async function testTelegram() {
+  const botToken = document.getElementById('botToken').value.trim();
+  const chatId   = document.getElementById('chatId').value.trim();
+  const resultEl = document.getElementById('testResult');
+  if (!validateBotToken(document.getElementById('botToken')) || !validateChatId(document.getElementById('chatId'))) {
+    showTestResult(false, 'Corrija os campos Bot Token e Chat ID antes de testar.');
+    return;
+  }
+  resultEl.style.display = 'block';
+  resultEl.className = 'test-result';
+  resultEl.textContent = '⏳ Enviando mensagem de teste...';
+  try {
+    const r = await fetch('/telegram-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ botToken, chatId })
+    });
+    const d = await r.json();
+    if (d.ok) showTestResult(true, '✅ Mensagem enviada com sucesso! Verifique seu Telegram.');
+    else      showTestResult(false, '❌ Erro: ' + (d.message || 'Resposta inválida do Telegram'));
+  } catch(e) { showTestResult(false, '❌ Falha na requisição: ' + e.message); }
+}
+function showTestResult(ok, text) {
+  const el = document.getElementById('testResult');
+  el.style.display = 'block';
+  el.className = 'test-result ' + (ok ? 'test-ok' : 'test-fail');
+  el.textContent = text;
+}
+
+// ── Schedule ───────────────────────────────────────────────────
+function onScheduleChange() {
+  const val = document.getElementById('alertSchedule').value;
+  document.getElementById('customScheduleBox').style.display = val === 'custom' ? 'block' : 'none';
+  if (val === 'custom') updateCronPreview();
+}
+
 function openTelegramModal() {
   fetch('/telegram-config').then(r=>r.json()).then(d=>{
-    document.getElementById('botToken').value = d.botToken || '';
-    document.getElementById('chatId').value = d.chatId || '';
-    const select = document.getElementById('alertSchedule');
+    const botEl = document.getElementById('botToken');
+    const cidEl = document.getElementById('chatId');
+    botEl.value = d.botToken || '';
+    cidEl.value = d.chatId  || '';
+    if (d.botToken) validateBotToken(botEl);
+    if (d.chatId)   validateChatId(cidEl);
+    document.getElementById('testResult').style.display = 'none';
+    const select    = document.getElementById('alertSchedule');
     const customBox = document.getElementById('customScheduleBox');
-    
     if (d.schedule) {
       let found = false;
-      for(let i=0; i<select.options.length; i++) {
-        if(select.options[i].value === d.schedule) {
-          select.selectedIndex = i;
-          found = true;
-          break;
-        }
+      for (let i=0; i<select.options.length; i++) {
+        if (select.options[i].value === d.schedule) { select.selectedIndex = i; found = true; break; }
       }
-      if(!found) {
+      if (!found) {
         select.value = 'custom';
         const parts = d.schedule.split(' ');
-        document.getElementById('customMinutes').value = parts[0];
-        document.getElementById('customHours').value = parts[1];
+        document.getElementById('customMinutes').value = parts[0] || '';
+        document.getElementById('customHours').value   = parts[1] || '';
         customBox.style.display = 'block';
+        sanitizeCronInput(document.getElementById('customMinutes'), 'min');
+        sanitizeCronInput(document.getElementById('customHours'), 'hour');
       } else {
         customBox.style.display = 'none';
       }
@@ -529,27 +818,33 @@ function openTelegramModal() {
     document.getElementById('tgModal').style.display = 'flex';
   });
 }
+
 function closeTelegramModal() { document.getElementById('tgModal').style.display = 'none'; }
+
 function saveTelegramConfig() {
-  const botToken = document.getElementById('botToken').value;
-  const chatId = document.getElementById('chatId').value;
+  const botEl = document.getElementById('botToken');
+  const cidEl = document.getElementById('chatId');
+  const botToken = botEl.value.trim();
+  const chatId   = cidEl.value.trim();
+  if (!validateBotToken(botEl) || !validateChatId(cidEl)) {
+    showTestResult(false, '⚠️ Corrija os erros antes de salvar.');
+    return;
+  }
   let schedule = document.getElementById('alertSchedule').value;
-  
   if (schedule === 'custom') {
-    const mins = document.getElementById('customMinutes').value.replace(/\s/g, '') || '0';
-    const hours = document.getElementById('customHours').value.replace(/\s/g, '') || '*';
-    if (!/^[0-9,*/-]+$/.test(mins) || !/^[0-9,*/-]+$/.test(hours)) { 
-      alert('Formato de minutos ou horas inválido! Use apenas números, vírgulas, asteriscos ou barras.'); 
-      return; 
+    const mins  = document.getElementById('customMinutes').value.trim();
+    const hours = document.getElementById('customHours').value.trim();
+    if (checkCronExpr(mins, 59) !== true || checkCronExpr(hours, 23) !== true) {
+      showTestResult(false, '⚠️ Corrija os campos de minutos e horas antes de salvar.');
+      return;
     }
     schedule = `${mins} ${hours} * * *`;
   }
-
   fetch('/telegram-config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ botToken, chatId, schedule })
-  }).then(() => { alert('Configuração salva e Cron atualizado!'); closeTelegramModal(); });
+  }).then(() => { closeTelegramModal(); });
 }
 async function up(){
   try{
