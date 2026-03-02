@@ -1,4 +1,4 @@
-# 🚀 MK-MSG: Integração Inteligente MK-Auth & WhatsApp
+# MK-MSG: Integração Inteligente MK-Auth & WhatsApp
 
 O **MK-MSG** é uma solução profissional e automatizada para provedores de internet que utilizam o **MK-Auth**. Ele simplifica a comunicação com seus clientes, enviando notificações de cobrança, lembretes de vencimento e confirmações de pagamento diretamente via WhatsApp.
 
@@ -29,40 +29,82 @@ Visualize e gerencie o status de todos os títulos (boletos/faturas) dos seus cl
 #### Títulos Pagos
 *Confirmação visual dos títulos que já foram quitados, garantindo que o cliente receba a confirmação de pagamento.*
 <img width="1420" height="995" alt="pago" src="https://github.com/user-attachments/assets/cc1d397f-a142-4ee0-85bf-279c5c127624" />
-<br><br>
 
 
-#### Envio em massa
-*Permite enviar mensagens em massa para um grupo de clientes ou para todos. É possivel salvar a lista de clientes e de mensagens.*
+---
+
+
+### 2. 📨 Envio em Massa
+
+Envie mensagens para grupos específicos de clientes ou para toda a sua base — inclusive para contatos externos ao MK-Auth. É possível salvar e reutilizar listas de clientes e mensagens.
+
+**Funcionalidades do envio em massa:**
+- ✅ Envio para múltiplos contatos de forma simples
+- 💾 Salvar e carregar listas de clientes e mensagens
+- ✏️ Editar listas de clientes e mensagens diretamente pelo painel
+- 📁 Importar contatos no formato **vCard (.vcf)**
+- 🔍 Pesquisa de contatos em tempo real dentro da lista
 <img width="1420" height="1472" alt="emmassa" src="https://github.com/user-attachments/assets/949e54df-4adc-4c20-8539-53610269ef0e" />
 
-<br><br>
 
-### 2. Configuração e Personalização de Mensagens
+---
+
+
+### 3. Configuração e Personalização de Mensagens
 
 Defina o conteúdo exato das mensagens que serão enviadas para cada situação (No Prazo, Vencido e Pago), utilizando variáveis dinâmicas do sistema.
 
-#### Configuração de Mensagens
-*Interface intuitiva para edição das mensagens, com pré-visualização em tempo real do WhatsApp.*
 <img width="1420" height="3048" alt="confmsg" src="https://github.com/user-attachments/assets/f2b23a6e-abc9-488e-beb2-a3f3919e51cb" />
-<br><br>
 
+---
 
-### 3. Dashboard e Configurações do Sistema
+### 4. ⚙️ Configurações Gerais e Agendamento
 
-Gerencie a conexão com a API do WhatsApp e configure os parâmetros globais de envio.
+Controle total sobre o comportamento dos envios automáticos:
 
-#### Configurações Gerais
-*Ajuste os tempos de pausa entre envios, os dias específicos para disparo de cada tipo de mensagem e os horários de execução do *daemon*.*
+- ⏱️ **Tempos de pausa** entre envios para evitar bloqueios
+- 📅 **Dias específicos** para disparo de cada tipo de mensagem
+- 🕐 **Horários de execução** configuráveis do daemon
+- 📆 **Envio em dias úteis ou todos os dias** — escolha por tipo de mensagem
+- 🔢 **Dias antes do vencimento** para envio preventivo (suporta valor zero = no mesmo dia)
+- 📵 **Envio para clientes bloqueados** — configurável com base na data de vencimento + dias para corte
+
 <img width="1420" height="3143" alt="confgeral" src="https://github.com/user-attachments/assets/b19da320-c60c-4ceb-a43c-58efb0b6857d" />
 <br><br>
 
+---
 
+### 5. 📱 Dashboard da API WhatsApp
 
-#### Dashboard da API WhatsApp
-*Conecte seu número de WhatsApp de forma segura via QR Code e monitore o status da conexão e a fila de envio.*
-<img width="1420" height="973" alt="whatsapp" src="https://github.com/user-attachments/assets/cd2fa987-f9d6-4ab1-bee2-e4a0e4606243" />
-<br><br>
+Conecte seu número de WhatsApp de forma segura via QR Code e monitore o status da conexão e a fila de envio em tempo real.
+
+<img width="1420" height="890" alt="13" src="https://github.com/user-attachments/assets/25cf4918-cbfa-4590-b9b5-acdf178afc04" />
+
+---
+
+### 6. 🔔 Alertas via Telegram
+
+Configure um bot do Telegram para receber alertas automáticos quando a API do WhatsApp ficar **offline**, garantindo que você nunca perca um envio sem saber.
+
+**Recursos do alerta Telegram:**
+- 🤖 Configuração do bot token e chat id
+- ✅ Botão de **teste** para validar as configurações
+- 📅 **Agendamento de verificação configurável** pelo painel web (ex: "A cada 20 minutos, 7h, 11h, das 15h às 20h, todos os dias")
+- 📌 Exemplos dinâmicos na interface para facilitar a configuração
+
+---
+
+### 7. 🔗 Integração da API do WhatsApp com outros sistemas
+
+O MK-MSG agora suporta integração com **outros sistemas que utilizam o padrão Evolution API versão 2**, não se limitando à API interna. Configure apontando para qualquer instância compatível usando:
+
+- **Nome da instância:** `default` (ou qualquer outro valor — este campo é ignorado)
+- **Token:** utilize o mesmo token gerado durante a instalação
+
+Isso permite usar o MK-MSG com qualquer sistema de WhatsApp API que seja compatível com o padrão Evolution API v2.
+
+Exemplo de integração com o Mk-Auth:
+<img width="1140" height="698" alt="16" src="https://github.com/user-attachments/assets/4ae9fded-e2fb-4792-a18f-9bd51c39fd0a" />
 
 
 ---
@@ -73,13 +115,17 @@ Gerencie a conexão com a API do WhatsApp e configure os parâmetros globais de 
 *   🤖 **Envios Automáticos**: Envios programados por data e hora para títulos no prazo, vencidos e pagos.
 *   📊 **Logs Detalhados**: Histórico completo de envios organizado por mês e categoria.
 *   🎨 **Interface Responsiva**: Dashboard moderno que funciona perfeitamente no celular e PC.
+*   📁 **Envio em Massa** —  Envie mensagens em massas e importe contatos externos no formato `.vcf`
+*   🔔 **Alertas por Telegram** — Monitoramento proativo do status da API, se o WhatsApp ficar offline, receba uma notificação via Telegram.
+*   🔗 **Multi-plataforma** — Compatível com padrão do Evolution API v2 para uso da API em outros sistemas.
+*   📵 **Aviso de Corte** — Envio automático de aviso antes do bloqueio do cliente.
 
 ---
 
 ## 🛠️ Pré-requisitos
 
 *   Servidor com **Ubuntu 24 ou Debian 13**.
-*   Acesso SSH ao seu servidor **MK-Auth**.
+*   Acesso SSH ao seu servidor **MK-Auth** (apenas se for usar o sistema Web MK-MSG, não é necessário se for usar somente a API do WhatsApp).
 *   Conexão com a Internet.
 
 ---
@@ -98,7 +144,6 @@ chmod +x install_mkmsg.sh
 ### 📝 O que o instalador fará por você:
 
 *   Instalará todas as dependências (Apache, PHP, etc).
-*   Configurará o acesso remoto ao banco de dados do seu **MK-Auth** via SSH.
 *   Gerará um **Token de Segurança** exclusivo de 20 caracteres.
 *   Instalará e configurará a **API do WhatsApp** localmente.
 *   Configurará o agendamento automático de mensagens.
