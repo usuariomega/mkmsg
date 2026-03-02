@@ -476,8 +476,8 @@ body{font-family:sans-serif;background:var(--bg);color:var(--text);display:flex;
 @media(min-width:600px){.title{font-size:28px}.l-row{flex-direction:row;align-items:center}.l-meta{margin-bottom:0;width:280px;flex-shrink:0}.msg{flex:1}}
 button{padding:6px 12px;border:none;border-radius:6px;background:#374151;color:#fff;cursor:pointer;font-size:12px;margin-left:5px}
 .btn-group{display:flex;align-items:center}
-.modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.5);align-items:center;justify-content:center}
-.modal-content{background:#fff;padding:20px;border-radius:12px;width:95%;max-width:480px;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+.modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+.modal-content{background:#fff;padding:20px;border-radius:12px;width:95%;max-width:480px;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-height:90vh;padding:20px;overflow-y:auto}
 .modal-content h3{margin-top:0;color:var(--primary)}
 .modal-content input, .modal-content select{width:100%;padding:10px;margin:10px 0;border:1px solid var(--border);border-radius:6px;font-size:14px}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:15px}
