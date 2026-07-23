@@ -57,7 +57,8 @@ if (isset($ignorar_fds_feriado) && $ignorar_fds_feriado == 1 && !isDiaUtil($hoje
 foreach ($diaspago as $dias) {
     $sql = "SELECT upper(vtab_titulos.nome_res) as nome_res, 
             REGEXP_REPLACE(vtab_titulos.celular,'[( )-]+','') AS celular,
-            DATE_FORMAT(vtab_titulos.datapag,'%d/%m/%y') AS datapag_fmt, 
+            DATE_FORMAT(vtab_titulos.datapag,'%d/%m/%y') AS datapag_fmt,
+            DATE_FORMAT(vtab_titulos.datavenc,'%d/%m/%y') AS datavenc_fmt,
             vtab_titulos.valor, vtab_titulos.linhadig, sis_qrpix.qrcode,
             vtab_titulos.datapag
             FROM vtab_titulos
@@ -103,8 +104,8 @@ foreach ($diaspago as $dias) {
         }
 
         $nome = $row['nome_res'];
-        $buscar = ['/%provedor%/', '/%nomeresumido%/', '/%datapag%/', '/%valor%/', '/%linhadig%/', '/%copiacola%/', '/%site%/'];
-        $substituir = [$provedor, $nome, $row['datapag_fmt'], $row['valor'], $row['linhadig'], urlencode($row['qrcode']), $site];
+        $buscar = ['/%provedor%/', '/%nomeresumido%/', '/%datapag%/', '/%datavenc%/', '/%valor%/', '/%linhadig%/', '/%copiacola%/', '/%site%/'];
+        $substituir = [$provedor, $nome, $row['datapag_fmt'], $row['datavenc_fmt'], $row['valor'], $row['linhadig'], urlencode($row['qrcode']), $site];
         $msgFinal = preg_replace($buscar, $substituir, $msg);
 
         $payload = ["numero" => "55" . $row['celular'], "mensagem" => $msgFinal];

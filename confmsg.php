@@ -110,7 +110,7 @@ $msgbloqueado = carregarMensagemArquivo($fileBloqueado);
                         <textarea name="msgpago" id="input-pago" oninput="updatePreview('pago')"><?php echo htmlspecialchars($msgpago); ?></textarea>
                         <div class="coringas-list">
                             <b>📌 Coringas Disponíveis:</b><br>
-                            %nomeresumido%,  %datapag%, %valor%, %provedor%, %site%<br>
+                            %nomeresumido%, %datavenc%, %datapag%, %valor%, %provedor%, %site%<br>
                             <b>⚡ Comandos:</b> %0A (Quebra de Linha), ## (Novo Balão)
                         </div>
                     </div>
