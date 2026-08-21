@@ -24,11 +24,15 @@ function getMySQLConnection($servername, $username, $password, $dbname, $port) {
 function getClientsFromVtabTitulos($servername, $username, $password, $dbname, $port) {
     $conn = getMySQLConnection($servername, $username, $password, $dbname, $port);
     if (!$conn) return [];
-    $sql = "SELECT id, upper(nome_res) as nome_res, 
-            REGEXP_REPLACE(celular,'[( )-]+','') AS celular 
-            FROM sis_cliente WHERE cli_ativado = 's' 
-            AND nome_res IS NOT NULL AND TRIM(nome_res) <> '' 
-            AND celular IS NOT NULL AND TRIM(celular) <> '' 
+    $sql = "SELECT id, upper(nome_res) as nome_res,
+            REGEXP_REPLACE(celular,'[( )-]+','') AS celular,
+            upper(cidade) as cidade,
+            upper(bairro) as bairro,
+            upper(porta_olt) as ramal,
+            upper(caixa_herm) as cto
+            FROM sis_cliente WHERE cli_ativado = 's'
+            AND nome_res IS NOT NULL AND TRIM(nome_res) <> ''
+            AND celular IS NOT NULL AND TRIM(celular) <> ''
             ORDER BY nome_res ASC";
 
     $result = $conn->query($sql);
@@ -36,9 +40,13 @@ function getClientsFromVtabTitulos($servername, $username, $password, $dbname, $
     if ($result && $result->num_rows > 0) {
         while ($row = $result->fetch_assoc()) {
             $clients[] = [
-                'id' => 'mk_' . $row['id'], 
-                'nome' => $row['nome_res'], 
+                'id' => 'mk_' . $row['id'],
+                'nome' => $row['nome_res'],
                 'celular' => $row['celular'],
+                'cidade' => $row['cidade'],
+                'bairro' => $row['bairro'],
+                'ramal' => $row['ramal'],
+                'cto' => $row['cto'],
                 'origem' => 'mk'
             ];
         }
@@ -382,7 +390,12 @@ $tMax = isset($tempomax) ? (int)$tempomax : 90;
                             <input type="checkbox" id="client_<?php echo $client['id']; ?>" value="<?php echo $client['id']; ?>" onchange="updateRecipientCount()" class="check">
                             <label for="client_<?php echo $client['id']; ?>">
                                 <span class="badge-<?php echo $client['origem']; ?>"><?php echo strtoupper($client['origem']); ?></span>
-                                <strong><?php echo $client['nome']; ?></strong> - <?php echo $client['celular']; ?>
+                                <strong class="client-nome"><?php echo $client['nome']; ?></strong>
+                                <span class="client-info"><?php echo $client['celular']; ?></span>
+                                <span class="client-info"><?php echo $client['cidade'] ?? ''; ?></span>
+                                <span class="client-info"><?php echo $client['bairro'] ?? ''; ?></span>
+                                <span class="client-info"><?php echo $client['ramal'] ?? ''; ?></span>
+                                <span class="client-info"><?php echo $client['cto'] ?? ''; ?></span>
                             </label>
                         </div>
                     <?php endforeach; ?>
@@ -521,8 +534,14 @@ function updateRecipientCount() {
     $('#recipientCount').text(selectedClients.length);
 }
 
-function selectAllClients() { $('.checkbox-item input[type="checkbox"]').prop('checked', true); updateRecipientCount(); }
-function deselectAllClients() { $('.checkbox-item input[type="checkbox"]').prop('checked', false); updateRecipientCount(); }
+function selectAllClients() { 
+    $('#clientsList .checkbox-item:visible input[type="checkbox"]').prop('checked', true); 
+    updateRecipientCount(); 
+}
+function deselectAllClients() { 
+    $('#clientsList .checkbox-item:visible input[type="checkbox"]').prop('checked', false); 
+    updateRecipientCount(); 
+}
 
 function filterClients(type) {
     const searchValue = (type === 'manual' ? $('#searchManual').val() : $('#searchEdit').val()).toLowerCase();
@@ -752,7 +771,7 @@ function editList(filename) {
             const clientIds = data.clientIds || [];
             allClients.forEach(client => {
                 const isChecked = clientIds.includes(client.id) ? 'checked' : '';
-                clientsHtml += `<div class="checkbox-item"><input type="checkbox" id="edit_client_${client.id}" value="${client.id}" ${isChecked} class="check"><label for="edit_client_${client.id}"><span class="badge-${client.origem}">${client.origem.toUpperCase()}</span><strong>${client.nome}</strong> - ${client.celular}</label></div>`;
+                clientsHtml += `<div class="checkbox-item"><input type="checkbox" id="edit_client_${client.id}" value="${client.id}" ${isChecked} class="check"><label for="edit_client_${client.id}"><span class="badge-${client.origem}">${client.origem.toUpperCase()}</span><strong>${client.nome}</strong> - ${client.celular}<span style="display:none;" class="search-extra">${client.cidade || ''} ${client.bairro || ''} ${client.ramal || ''} ${client.cto || ''}</span></label></div>`;
             });
             $('#editListClientsContainer').html(clientsHtml);
             $('#editListModal').addClass('active');

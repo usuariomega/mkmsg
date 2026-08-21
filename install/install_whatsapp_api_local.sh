@@ -347,7 +347,7 @@ async function connectToWhatsApp() {
     auth: state,
     printQRInTerminal: false,
     logger: pino({ level: 'silent' }),
-    browser: ['Mac OS', 'Chrome', '146.0.0.0']
+    browser: ['Mac OS', 'Chrome', '151.0.0.0']
   })
   sock.ev.on('creds.update', saveCreds)
   sock.ev.on('connection.update', async (update) => {
