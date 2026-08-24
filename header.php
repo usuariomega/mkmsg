@@ -266,8 +266,6 @@ include 'config.php';
     .select-limit { width: 80px; }
     .form-label { display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary); }
     .form-input-full { width: 100%; }
-    .client-nome { display: inline-block; min-width: 180px; }
-    .client-info { display: inline-block; min-width: 120px; color: #666; }
     
     /* Configuração de Mensagens */
     .container-conf { max-width: 1200px; margin: 0 auto; } /* Removido padding conforme solicitado */

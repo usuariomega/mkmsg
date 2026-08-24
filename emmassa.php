@@ -334,6 +334,8 @@ $tMax = isset($tempomax) ? (int)$tempomax : 90;
     .whatsapp-bubble::before { content: ""; position: absolute; width: 0; height: 0; border-top: 10px solid transparent; border-bottom: 10px solid transparent; border-right: 10px solid #fff; left: -10px; top: 0; }
     .badge-mk { background: #28a745; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-right: 8px; font-weight: bold; }
     .badge-imp { background: #007bff; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-right: 8px; font-weight: bold; }
+    .client-nome { display: inline-block; min-width: 180px; }
+    .client-info { display: inline-block; min-width: 120px; color: #666; }
 </style>
 
 <div class="container">
@@ -386,7 +388,13 @@ $tMax = isset($tempomax) ? (int)$tempomax : 90;
                 </div>
                 <div id="clientsList" class="checkbox-list">
                     <?php foreach ($allClients as $client): ?>
-                        <div class="checkbox-item">
+                        <div class="checkbox-item"
+                            data-nome="<?php echo strtolower($client['nome'] ?? ''); ?>"
+                            data-celular="<?php echo strtolower($client['celular'] ?? ''); ?>"
+                            data-cidade="<?php echo strtolower($client['cidade'] ?? ''); ?>"
+                            data-bairro="<?php echo strtolower($client['bairro'] ?? ''); ?>"
+                            data-ramal="<?php echo strtolower($client['ramal'] ?? ''); ?>"
+                            data-cto="<?php echo strtolower($client['cto'] ?? ''); ?>">
                             <input type="checkbox" id="client_<?php echo $client['id']; ?>" value="<?php echo $client['id']; ?>" onchange="updateRecipientCount()" class="check">
                             <label for="client_<?php echo $client['id']; ?>">
                                 <span class="badge-<?php echo $client['origem']; ?>"><?php echo strtoupper($client['origem']); ?></span>
@@ -407,6 +415,7 @@ $tMax = isset($tempomax) ? (int)$tempomax : 90;
                         <button type="button" class="button button-danger button-small" onclick="deleteSelectedImported()" style="background-color: #dc3545;">🗑️ Excluir Selecionados</button>
                         <button type="button" class="button button-danger button-small" onclick="clearAllImported()" style="background-color: #dc3545;">🗑️ Limpar Todos</button>
                     <?php endif; ?>
+                    <button type="button" class="button button-small" onclick="openExemplosModal()" style="background-color: #00b32b;">Exemplos de Filtros</button>
                 </div>
             </div>
 
@@ -470,6 +479,42 @@ $tMax = isset($tempomax) ? (int)$tempomax : 90;
 <div id="loadMessageModal" class="modal"><div class="modal-content" style="max-width: 600px;"><div class="modal-header">Modelos de Mensagem</div><div id="savedMessagesContainer" class="saved-items"></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#loadMessageModal').removeClass('active')">Fechar</button></div></div></div>
 <div id="editListModal" class="modal"><div class="modal-content"><div class="modal-header">Editar Lista de Contatos</div><div class="modal-body"><label class="form-label">Nome da Lista</label><input type="text" id="editListName" class="form-input-full" placeholder="Ex: Clientes Vencidos Jan"><div style="margin-top: 16px; margin-bottom: 12px;"><input type="text" id="searchEdit" class="form-input-full" placeholder="🔍 Pesquisar por nome ou celular..." onkeyup="filterClients('edit')"></div><div id="editListClientsContainer" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px;"></div></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#editListModal').removeClass('active')">Cancelar</button><button type="button" class="button" onclick="saveEditedList()">Salvar Alteracoes</button></div></div></div>
 <div id="editMessageModal" class="modal"><div class="modal-content"><div class="modal-header">Editar Modelo de Mensagem</div><div class="modal-body"><label class="form-label">Nome do Modelo</label><input type="text" id="editMessageName" class="form-input-full" placeholder="Ex: Aviso de Vencimento"><label class="form-label" style="margin-top: 16px;">Conteudo</label><textarea id="editMessageContent" class="form-input-full" style="min-height: 180px; font-family: 'Courier New', Courier, monospace; font-size: 14px;"></textarea></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#editMessageModal').removeClass('active')">Cancelar</button><button type="button" class="button" onclick="saveEditedMessage()">Salvar Alteracoes</button></div></div></div>
+
+<!-- Modais -->
+<div id="exemplosModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">Exemplos de Filtros de Pesquisa:</div>
+            <div class="modal-body" style="font-family: sans-serif; text-align: left; line-height: 1.5;">
+                <p style="font-size: 14px; margin-bottom: 15px; font-weight: bold; color: #333;">Busca livre (Uma ou mais palavras de qualquer coluna)</p>
+                <p style="font-size: 14px; margin-bottom: 15px; font-weight: bold; color: #333;">Busca coluna (Colunas: nome,telefone,cidade,bairro,ramal,cto)</p>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="background: #f8f9fa; padding: 10px; border-left: 4px solid #00b32b; border-radius: 0 4px 4px 0;">
+                        <code style="font-weight: bold; color: #d63384; font-size: 13px;">joao ou rio e bairro:vila</code>
+                        <div style="color: #555; margin-top: 4px; font-size: 13px;">→ (joão ou rio em qualquer coluna) e (vila apenas na coluna bairro)</div>
+                    </div>
+
+                    <div style="background: #f8f9fa; padding: 10px; border-left: 4px solid #00b32b; border-radius: 0 4px 4px 0;">
+                        <code style="font-weight: bold; color: #d63384; font-size: 13px;">ana e ramal:12</code>
+                        <div style="color: #555; margin-top: 4px; font-size: 13px;">→ ana (em qualquer coluna) e 12 apenas na coluna ramal</div>
+                    </div>
+
+                    <div style="background: #f8f9fa; padding: 10px; border-left: 4px solid #00b32b; border-radius: 0 4px 4px 0;">
+                        <code style="font-weight: bold; color: #d63384; font-size: 13px;">nome:maria e cidade:rio ou são paulo</code>
+                        <div style="color: #555; margin-top: 4px; font-size: 13px;">→ nome = maria e (cidade = rio ou cidade = são paulo)</div>
+                    </div>
+
+                    <div style="background: #f8f9fa; padding: 10px; border-left: 4px solid #00b32b; border-radius: 0 4px 4px 0;">
+                        <code style="font-weight: bold; color: #d63384; font-size: 13px;">nome:ana</code>
+                        <div style="color: #555; margin-top: 4px; font-size: 13px;">→ busca por ana apenas na coluna nome, como analice, mariana e ignora as demais colunas como a cidade anapolis</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="text-align: right; margin-top: 15px;">
+                <button type="button" class="button3" onclick="$('#exemplosModal').removeClass('active')">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div id="overlay" class="modal">
     <div class="modal-content" style="max-width: 600px;">
@@ -543,12 +588,38 @@ function deselectAllClients() {
     updateRecipientCount(); 
 }
 
+const FIELD_MAP = {
+    nome: 'nome',
+    celular: 'celular',
+    cidade: 'cidade',
+    bairro: 'bairro',
+    ramal: 'ramal',
+    cto: 'cto'
+};
+
+function valueMatches($item, value) {
+    const m = value.match(/^([a-zà-ú_]+)\s*:\s*(.+)$/i);
+    if (m) {
+        const field = FIELD_MAP[m[1].toLowerCase()];
+        if (field) {
+            const fieldText = String($item.data(field) || '').toLowerCase();
+            return fieldText.includes(m[2].trim().toLowerCase());
+        }
+    }
+    return $item.text().toLowerCase().includes(value.toLowerCase());
+}
+
 function filterClients(type) {
     const searchValue = (type === 'manual' ? $('#searchManual').val() : $('#searchEdit').val()).toLowerCase();
     const container = type === 'manual' ? '#clientsList' : '#editListClientsContainer';
+
+    const andGroups = searchValue.split(/\s+e\s+/i).map(g => g.trim()).filter(Boolean);
+    const groups = andGroups.map(g => g.split(/\s+ou\s+/i).map(v => v.trim()).filter(Boolean));
+
     $(container + ' .checkbox-item').each(function() {
-        const text = $(this).text().toLowerCase();
-        $(this).toggle(text.includes(searchValue));
+        const $item = $(this);
+        const matches = groups.every(group => group.some(value => valueMatches($item, value)));
+        $item.toggle(matches);
     });
 }
 
@@ -644,6 +715,8 @@ function clearAllImported() {
         $.post('', { action: 'clearImported' }, function(res) { if (res.success) location.reload(); });
     }
 }
+
+function openExemplosModal() { $('#exemplosModal').addClass('active'); }
 
 function openSaveListModal() { if (selectedClients.length === 0) return alert('Selecione clientes primeiro'); $('#saveListModal').addClass('active'); }
 
@@ -771,7 +844,16 @@ function editList(filename) {
             const clientIds = data.clientIds || [];
             allClients.forEach(client => {
                 const isChecked = clientIds.includes(client.id) ? 'checked' : '';
-                clientsHtml += `<div class="checkbox-item"><input type="checkbox" id="edit_client_${client.id}" value="${client.id}" ${isChecked} class="check"><label for="edit_client_${client.id}"><span class="badge-${client.origem}">${client.origem.toUpperCase()}</span><strong>${client.nome}</strong> - ${client.celular}<span style="display:none;" class="search-extra">${client.cidade || ''} ${client.bairro || ''} ${client.ramal || ''} ${client.cto || ''}</span></label></div>`;
+                clientsHtml += `<div class="checkbox-item"
+                    data-nome="${(client.nome || '').toLowerCase()}"
+                    data-celular="${(client.celular || '').toLowerCase()}"
+                    data-cidade="${(client.cidade || '').toLowerCase()}"
+                    data-bairro="${(client.bairro || '').toLowerCase()}"
+                    data-ramal="${(client.ramal || '').toLowerCase()}"
+                    data-cto="${(client.cto || '').toLowerCase()}">
+                    <input type="checkbox" id="edit_client_${client.id}" value="${client.id}" ${isChecked} class="check">
+                    <label for="edit_client_${client.id}"><span class="badge-${client.origem}">${client.origem.toUpperCase()}</span><strong>${client.nome}</strong> - ${client.celular}</label>
+                </div>`;
             });
             $('#editListClientsContainer').html(clientsHtml);
             $('#editListModal').addClass('active');
