@@ -477,7 +477,7 @@ $tMax = isset($tempomax) ? (int)$tempomax : 90;
 <div id="loadListModal" class="modal"><div class="modal-content" style="max-width: 600px;"><div class="modal-header">Gerenciar Listas Salvas</div><div id="savedListsContainer" class="saved-items"></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#loadListModal').removeClass('active')">Fechar</button></div></div></div>
 <div id="saveMessageModal" class="modal"><div class="modal-content"><div class="modal-header">Salvar Modelo de Mensagem</div><div class="modal-body"><label class="form-label">Nome do Modelo</label><input type="text" id="newMessageName" class="form-input-full" placeholder="Ex: Aviso de Vencimento"></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#saveMessageModal').removeClass('active')">Cancelar</button><button type="button" class="button" onclick="saveCurrentMessage()">Salvar</button></div></div></div>
 <div id="loadMessageModal" class="modal"><div class="modal-content" style="max-width: 600px;"><div class="modal-header">Modelos de Mensagem</div><div id="savedMessagesContainer" class="saved-items"></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#loadMessageModal').removeClass('active')">Fechar</button></div></div></div>
-<div id="editListModal" class="modal"><div class="modal-content"><div class="modal-header">Editar Lista de Contatos</div><div class="modal-body"><label class="form-label">Nome da Lista</label><input type="text" id="editListName" class="form-input-full" placeholder="Ex: Clientes Vencidos Jan"><div style="margin-top: 16px; margin-bottom: 12px;"><input type="text" id="searchEdit" class="form-input-full" placeholder="🔍 Pesquisar por nome ou celular..." onkeyup="filterClients('edit')"></div><div id="editListClientsContainer" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px;"></div></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#editListModal').removeClass('active')">Cancelar</button><button type="button" class="button" onclick="saveEditedList()">Salvar Alteracoes</button></div></div></div>
+<div id="editListModal" class="modal"><div class="modal-content" style="max-width: 900px;"><div class="modal-header">Editar Lista de Contatos</div><div class="modal-body"><label class="form-label">Nome da Lista</label><input type="text" id="editListName" class="form-input-full" placeholder="Ex: Clientes Vencidos Jan"><div style="margin-top: 16px; margin-bottom: 12px;"><input type="text" id="searchEdit" class="form-input-full" placeholder="🔍 Pesquisar por nome ou celular..." onkeyup="filterClients('edit')"></div><div id="editListClientsContainer" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px;"></div></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#editListModal').removeClass('active')">Cancelar</button><button type="button" class="button" onclick="saveEditedList()">Salvar Alteracoes</button></div></div></div>
 <div id="editMessageModal" class="modal"><div class="modal-content"><div class="modal-header">Editar Modelo de Mensagem</div><div class="modal-body"><label class="form-label">Nome do Modelo</label><input type="text" id="editMessageName" class="form-input-full" placeholder="Ex: Aviso de Vencimento"><label class="form-label" style="margin-top: 16px;">Conteudo</label><textarea id="editMessageContent" class="form-input-full" style="min-height: 180px; font-family: 'Courier New', Courier, monospace; font-size: 14px;"></textarea></div><div class="modal-footer"><button type="button" class="button3" onclick="$('#editMessageModal').removeClass('active')">Cancelar</button><button type="button" class="button" onclick="saveEditedMessage()">Salvar Alteracoes</button></div></div></div>
 
 <!-- Modais -->
@@ -591,6 +591,7 @@ function deselectAllClients() {
 const FIELD_MAP = {
     nome: 'nome',
     celular: 'celular',
+    telefone: 'celular',
     cidade: 'cidade',
     bairro: 'bairro',
     ramal: 'ramal',
@@ -840,6 +841,7 @@ function editList(filename) {
             currentEditListFilename = filename;
             const data = res.data;
             $('#editListName').val(data.name);
+            $('#searchEdit').val('');
             let clientsHtml = '';
             const clientIds = data.clientIds || [];
             allClients.forEach(client => {
@@ -852,7 +854,15 @@ function editList(filename) {
                     data-ramal="${(client.ramal || '').toLowerCase()}"
                     data-cto="${(client.cto || '').toLowerCase()}">
                     <input type="checkbox" id="edit_client_${client.id}" value="${client.id}" ${isChecked} class="check">
-                    <label for="edit_client_${client.id}"><span class="badge-${client.origem}">${client.origem.toUpperCase()}</span><strong>${client.nome}</strong> - ${client.celular}</label>
+                    <label for="edit_client_${client.id}">
+                        <span class="badge-${client.origem}">${client.origem.toUpperCase()}</span>
+                        <strong class="client-nome">${client.nome || ''}</strong>
+                        <span class="client-info">${client.celular || ''}</span>
+                        <span class="client-info">${client.cidade || ''}</span>
+                        <span class="client-info">${client.bairro || ''}</span>
+                        <span class="client-info">${client.ramal || ''}</span>
+                        <span class="client-info">${client.cto || ''}</span>
+                    </label>
                 </div>`;
             });
             $('#editListClientsContainer').html(clientsHtml);
